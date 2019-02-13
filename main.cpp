@@ -13,10 +13,20 @@
 
 using namespace glm;
 
+struct IndicesOpenGL{
+    unsigned int VAO;
+    unsigned int VBO;
+    unsigned int EBO;
+};
+
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void mouse_callback(GLFWwindow* window, double xpos, double ypos);
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 void processInput(GLFWwindow *window);
+IndicesOpenGL inicializarGrid();
+IndicesOpenGL inicializarLinhas();
+void updateLinhas(IndicesOpenGL indices, const float* verticesLinhas, unsigned int numLinhas);
+void freeIndicesOpenGL(IndicesOpenGL* indicesOpenGL);
 
 // settings
 const unsigned int SCR_WIDTH = 800;
@@ -31,6 +41,9 @@ bool firstMouse = true;
 // timing
 float deltaTime = 0.0f;
 float lastFrame = 0.0f;
+
+vec3 posPessoa(0.f, .1f, 0.f);
+unsigned int numLinhas = 0;
 
 int main(){
     // glfw: initialize and configure
@@ -68,6 +81,110 @@ int main(){
     }
 
     //Grid
+    auto gridIndices = inicializarGrid();
+
+    //Linhas
+    auto linhasIndices = inicializarLinhas();
+
+    // configure global opengl state
+    // -----------------------------
+    glEnable(GL_DEPTH_TEST);
+
+    // build and compile our shader program
+    // ------------------------------------
+
+    Shader lightingShader(R"(../shader/shader.vs)", R"(../shader/shader_no_texture.fs)");
+    Shader gridShader(R"(../shader/gridshader.vs)", R"(../shader/gridshader.fs)");
+    Shader linhasShader(R"(../shader/lineshader.vs)", R"(../shader/lineshader.fs)");
+
+    //Carregando o modelo
+    //Model modelo = loadModel(R"(../model/CentroFortaleza.fbx)");
+    Model modelo = loadModel(R"(../model/centro.obj)");
+
+    // render loop
+    // -----------
+    while (!glfwWindowShouldClose(window)){
+        // per-frame time logic
+        // --------------------
+        auto currentFrame = float(glfwGetTime());
+        deltaTime = currentFrame - lastFrame;
+        lastFrame = currentFrame;
+
+        // input
+        // -----
+        processInput(window);
+
+        // render
+        // ------
+        glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        mat4 projection = perspective(radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
+        mat4 view       = camera.GetViewMatrix();
+        mat4 model      = mat4(1.0f);
+
+        gridShader.use();
+        gridShader.setMat4("projection", projection);
+        gridShader.setMat4("view", view);
+        gridShader.setMat4("model", model);
+        gridShader.setFloat("tamanhoQuadrado", 0.5);
+        gridShader.setInt("numPosVisiveis", 1);
+        gridShader.setVec2("posVisiveis[0]", 0.f, 0.f);
+
+        glBindVertexArray(gridIndices.VAO);
+        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+
+        // be sure to activate shader when setting uniforms/drawing objects
+        lightingShader.use();
+        lightingShader.setVec3("viewPos", camera.Position);
+        lightingShader.setFloat("material.shininess", 32.0f);
+        lightingShader.setVec3("material.ambient", 1.f, 1.f, 1.f);
+        lightingShader.setVec3("material.diffuse", 1.f, 1.f, 1.f);
+        lightingShader.setVec3("material.specular", 0.f, 0.f, 0.f);
+
+        //Directional light
+        lightingShader.setVec3("dirLight.direction", -0.2f, -1.0f, -0.3f);
+        lightingShader.setVec3("dirLight.ambient", 0.5f, 0.5f, 0.5f);
+        lightingShader.setVec3("dirLight.diffuse", 0.4f, 0.4f, 0.4f);
+        lightingShader.setVec3("dirLight.specular", 0.5f, 0.5f, 0.5f);
+
+        // view/projection transformations
+        lightingShader.setMat4("projection", projection);
+        lightingShader.setMat4("view", view);
+
+        // render model
+        //model = scale(mat4(1.0f), vec3(0.005f));
+        model = mat4(1.0f);
+        lightingShader.setMat4("model", model);
+        DrawModel(&modelo, lightingShader.ID);
+
+        //Desenha as linhas
+        linhasShader.use();
+        linhasShader.setMat4("projection", projection);
+        linhasShader.setMat4("view", view);
+        linhasShader.setMat4("model", model);
+        glBindVertexArray(linhasIndices.VAO);
+        glDrawElements(GL_LINES, (numLinhas + 1)*2, GL_UNSIGNED_INT, 0);
+
+        // glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
+        // -------------------------------------------------------------------------------
+        glfwSwapBuffers(window);
+        glfwPollEvents();
+    }
+
+    // optional: de-allocate all resources once they've outlived their purpose:
+    // ------------------------------------------------------------------------
+    freeModel(&modelo);
+    freeIndicesOpenGL(&gridIndices);
+    freeIndicesOpenGL(&linhasIndices);
+
+    // glfw: terminate, clearing all previously allocated GLFW resources.
+    // ------------------------------------------------------------------
+    glfwTerminate();
+    return 0;
+}
+
+IndicesOpenGL inicializarGrid(){
     float gridVertices[] = {
             // positions          // texture coords
             0.5f,  0.0f,  0.5f,  1.0f, 1.0f, // top right
@@ -101,92 +218,72 @@ int main(){
     glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
     glEnableVertexAttribArray(1);
 
-    // configure global opengl state
-    // -----------------------------
-    glEnable(GL_DEPTH_TEST);
+    return (IndicesOpenGL){gridVAO, gridVBO, gridEBO};
+}
 
-    // build and compile our shader zprogram
-    // ------------------------------------
+IndicesOpenGL inicializarLinhas(){
+    float linhasVertices[] = {
+            posPessoa.x, posPessoa.y, posPessoa.z,
+            posPessoa.x, 0.0f       , posPessoa.z
+    };
+    unsigned int linhasIndices[] = {
+            0, 1
+    };
 
-    Shader lightingShader(R"(../shader/shader.vs)", R"(../shader/shader_no_texture.fs)");
-    Shader gridShader(R"(../shader/gridshader.vs)", R"(../shader/gridshader.fs)");
+    unsigned int linhaVBO, linhaVAO, linhaEBO;
 
-    //Carregando o modelo
-    Model modelo = loadModel(R"(../model/centro.obj)");
+    glGenVertexArrays(1, &linhaVAO);
+    glGenBuffers(1, &linhaVBO);
+    glGenBuffers(1, &linhaEBO);
 
-    // render loop
-    // -----------
-    while (!glfwWindowShouldClose(window)){
-        // per-frame time logic
-        // --------------------
-        auto currentFrame = float(glfwGetTime());
-        deltaTime = currentFrame - lastFrame;
-        lastFrame = currentFrame;
+    glBindVertexArray(linhaVAO);
 
-        // input
-        // -----
-        processInput(window);
+    glBindBuffer(GL_ARRAY_BUFFER, linhaVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(linhasVertices), linhasVertices, GL_STATIC_DRAW);
 
-        // render
-        // ------
-        glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, linhaEBO);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(linhasIndices), linhasIndices, GL_STATIC_DRAW);
 
-        mat4 projection = perspective(radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
-        mat4 view       = camera.GetViewMatrix();
-        mat4 model      = mat4(1.0f);
+    // position attribute
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
 
-        gridShader.use();
-        gridShader.setMat4("projection", projection);
-        gridShader.setMat4("view", view);
-        gridShader.setMat4("model", model);
-        gridShader.setFloat("tamanhoQuadrado", 0.5);
-        gridShader.setInt("numPosVisiveis", 1);
-        gridShader.setVec2("posVisiveis[0]", 0.f, 0.f);
+    return (IndicesOpenGL){linhaVAO, linhaVBO, linhaEBO};
+}
 
-        glBindVertexArray(gridVAO);
-        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
-
-        // be sure to activate shader when setting uniforms/drawing objects
-        lightingShader.use();
-        lightingShader.setVec3("viewPos", camera.Position);
-        lightingShader.setFloat("material.shininess", 32.0f);
-        lightingShader.setVec3("material.ambient", 1.f, 1.f, 1.f);
-        lightingShader.setVec3("material.diffuse", 1.f, 1.f, 1.f);
-        lightingShader.setVec3("material.specular", 0.f, 0.f, 0.f);
-
-        //Directional light
-        lightingShader.setVec3("dirLight.direction", -0.2f, -1.0f, -0.3f);
-        lightingShader.setVec3("dirLight.ambient", 0.5f, 0.5f, 0.5f);
-        lightingShader.setVec3("dirLight.diffuse", 0.4f, 0.4f, 0.4f);
-        lightingShader.setVec3("dirLight.specular", 0.5f, 0.5f, 0.5f);
-
-        // view/projection transformations
-        lightingShader.setMat4("projection", projection);
-        lightingShader.setMat4("view", view);
-
-        // render model
-        model = mat4(1.0f);
-        lightingShader.setMat4("model", model);
-        DrawModel(&modelo, lightingShader.ID);
-
-        // glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
-        // -------------------------------------------------------------------------------
-        glfwSwapBuffers(window);
-        glfwPollEvents();
+void updateLinhas(IndicesOpenGL indices, const float* verticesLinhas, unsigned int numLinhas){
+    float linhasVertices[3*(numLinhas+2)];
+    linhasVertices[0] = posPessoa.x;
+    linhasVertices[1] = posPessoa.y;
+    linhasVertices[2] = posPessoa.z;
+    linhasVertices[3] = posPessoa.x;
+    linhasVertices[4] = 0.f;
+    linhasVertices[5] = posPessoa.z;
+    for(unsigned int i = 0; i < 3*numLinhas; i++){
+        linhasVertices[6 + i] = verticesLinhas[i];
     }
 
-    // optional: de-allocate all resources once they've outlived their purpose:
-    // ------------------------------------------------------------------------
-    freeModel(&modelo);
-    glDeleteVertexArrays(1, &gridVAO);
-    glDeleteBuffers(1, &gridVBO);
-    glDeleteBuffers(1, &gridEBO);
+    unsigned int linhasIndices[2*(numLinhas + 1)];
+    linhasIndices[0] = 0;
+    linhasIndices[1] = 1;
+    for(unsigned int i = 0; i < numLinhas; i++){
+        linhasIndices[2 + (i*2)] = 0;
+        linhasIndices[3 + (i*2)] = 3 + i;
+    }
 
-    // glfw: terminate, clearing all previously allocated GLFW resources.
-    // ------------------------------------------------------------------
-    glfwTerminate();
-    return 0;
+    glBindVertexArray(indices.VAO);
+
+    glBindBuffer(GL_ARRAY_BUFFER, indices.VBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(linhasVertices), linhasVertices, GL_STATIC_DRAW);
+
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indices.EBO);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(linhasIndices), linhasIndices, GL_STATIC_DRAW);
+}
+
+void freeIndicesOpenGL(IndicesOpenGL* indicesOpenGL){
+    glDeleteVertexArrays(1, &indicesOpenGL->VAO);
+    glDeleteBuffers(1, &indicesOpenGL->VBO);
+    glDeleteBuffers(1, &indicesOpenGL->EBO);
 }
 
 // process all input: query GLFW whether relevant keys are pressed/released this frame and react accordingly
@@ -234,5 +331,5 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos){
 // glfw: whenever the mouse scroll wheel scrolls, this callback is called
 // ----------------------------------------------------------------------
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset){
-    camera.ProcessMouseScroll(yoffset);
+    camera.ProcessMouseScroll(float(yoffset));
 }
