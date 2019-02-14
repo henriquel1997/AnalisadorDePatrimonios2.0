@@ -32,7 +32,7 @@ bool equal(float x, float y){
 bool mod(float x, float y){
     if(y > 0) {
         while(x > 0){
-                x -= y;
+            x -= y;
         }
     }
 

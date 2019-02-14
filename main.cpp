@@ -4,6 +4,7 @@
 #include "model_loading.h"
 #include "shader.h"
 #include "camera.h"
+#include "lista.h"
 
 #include "glad.h"
 #include "GLFW/glfw3.h"
@@ -12,6 +13,17 @@
 #include <glm/gtc/type_ptr.hpp>
 
 using namespace glm;
+
+struct BoundingBox{
+    float min;
+    float max;
+};
+
+struct Patrimonio {
+    int id;
+    Mesh mesh;
+    BoundingBox bBox;
+};
 
 struct IndicesOpenGL{
     unsigned int VAO;
@@ -28,8 +40,6 @@ IndicesOpenGL inicializarLinhas();
 void updateLinhas(IndicesOpenGL indices, const float* verticesLinhas, unsigned int nLinhas);
 void freeIndicesOpenGL(IndicesOpenGL* indicesOpenGL);
 float float_rand( float min, float max);
-template <typename T>
-T* addToArray(T* array, int size, T newValue);
 
 // settings
 const unsigned int SCR_WIDTH = 800;
@@ -47,6 +57,8 @@ float lastFrame = 0.0f;
 
 vec3 posPessoa(0.f, .1f, 0.f);
 unsigned int numLinhas = 0;
+
+Lista<Patrimonio> patrimonios;
 
 int main(){
     // glfw: initialize and configure
@@ -345,15 +357,4 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset){
 float float_rand( float min, float max ){
     float scale = rand() / (float) RAND_MAX; /* [0, 1.0] */
     return min + scale * ( max - min );      /* [min, max] */
-}
-
-template <typename T>
-T* addToArray(T* array, int size, T newValue){
-    auto newArray = (T*)malloc(sizeof(T)*(size + 1));
-    for(int i = 0; i < size; i++){
-        newArray[i] = array[i];
-    }
-    newArray[size] = newValue;
-    free(array);
-    return newArray;
 }
