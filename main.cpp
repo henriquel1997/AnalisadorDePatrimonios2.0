@@ -25,8 +25,11 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 void processInput(GLFWwindow *window);
 IndicesOpenGL inicializarGrid();
 IndicesOpenGL inicializarLinhas();
-void updateLinhas(IndicesOpenGL indices, const float* verticesLinhas, unsigned int numLinhas);
+void updateLinhas(IndicesOpenGL indices, const float* verticesLinhas, unsigned int nLinhas);
 void freeIndicesOpenGL(IndicesOpenGL* indicesOpenGL);
+float float_rand( float min, float max);
+template <typename T>
+T* addToArray(T* array, int size, T newValue);
 
 // settings
 const unsigned int SCR_WIDTH = 800;
@@ -89,6 +92,8 @@ int main(){
     // configure global opengl state
     // -----------------------------
     glEnable(GL_DEPTH_TEST);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
     // build and compile our shader program
     // ------------------------------------
@@ -114,6 +119,13 @@ int main(){
         // -----
         processInput(window);
 
+//        unsigned int nLinhas = 60000;
+//        float novasLinhas[nLinhas*3];
+//        for(unsigned int i = 0; i < nLinhas*3; i++){
+//            novasLinhas[i] = float_rand(-1.f, 1.f);
+//        }
+//        updateLinhas(linhasIndices, novasLinhas, nLinhas);
+
         // render
         // ------
         glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
@@ -128,8 +140,8 @@ int main(){
         gridShader.setMat4("view", view);
         gridShader.setMat4("model", model);
         gridShader.setFloat("tamanhoQuadrado", 0.5);
-        gridShader.setInt("numPosVisiveis", 1);
-        gridShader.setVec2("posVisiveis[0]", 0.f, 0.f);
+        //gridShader.setInt("numPosVisiveis", 1);
+        //gridShader.setVec2("posVisiveis[0]", 0.f, 0.f);
 
         glBindVertexArray(gridIndices.VAO);
         glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
@@ -222,13 +234,6 @@ IndicesOpenGL inicializarGrid(){
 }
 
 IndicesOpenGL inicializarLinhas(){
-    float linhasVertices[] = {
-            posPessoa.x, posPessoa.y, posPessoa.z,
-            posPessoa.x, 0.0f       , posPessoa.z
-    };
-    unsigned int linhasIndices[] = {
-            0, 1
-    };
 
     unsigned int linhaVBO, linhaVAO, linhaEBO;
 
@@ -238,37 +243,32 @@ IndicesOpenGL inicializarLinhas(){
 
     glBindVertexArray(linhaVAO);
 
-    glBindBuffer(GL_ARRAY_BUFFER, linhaVBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(linhasVertices), linhasVertices, GL_STATIC_DRAW);
+    auto linhasIndices = (IndicesOpenGL){linhaVAO, linhaVBO, linhaEBO};
 
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, linhaEBO);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(linhasIndices), linhasIndices, GL_STATIC_DRAW);
+    updateLinhas(linhasIndices, nullptr, 0);
 
-    // position attribute
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(0);
-
-    return (IndicesOpenGL){linhaVAO, linhaVBO, linhaEBO};
+    return linhasIndices;
 }
 
-void updateLinhas(IndicesOpenGL indices, const float* verticesLinhas, unsigned int numLinhas){
-    float linhasVertices[3*(numLinhas+2)];
+void updateLinhas(IndicesOpenGL indices, const float* verticesLinhas, unsigned int nLinhas){
+
+    float linhasVertices[3*(nLinhas+2)];
     linhasVertices[0] = posPessoa.x;
     linhasVertices[1] = posPessoa.y;
     linhasVertices[2] = posPessoa.z;
     linhasVertices[3] = posPessoa.x;
     linhasVertices[4] = 0.f;
     linhasVertices[5] = posPessoa.z;
-    for(unsigned int i = 0; i < 3*numLinhas; i++){
+    for(unsigned int i = 0; i < 3*nLinhas; i++){
         linhasVertices[6 + i] = verticesLinhas[i];
     }
 
-    unsigned int linhasIndices[2*(numLinhas + 1)];
+    unsigned int linhasIndices[2*(nLinhas + 1)];
     linhasIndices[0] = 0;
     linhasIndices[1] = 1;
-    for(unsigned int i = 0; i < numLinhas; i++){
+    for(unsigned int i = 0; i < nLinhas; i++){
         linhasIndices[2 + (i*2)] = 0;
-        linhasIndices[3 + (i*2)] = 3 + i;
+        linhasIndices[3 + (i*2)] = 2 + i;
     }
 
     glBindVertexArray(indices.VAO);
@@ -278,6 +278,14 @@ void updateLinhas(IndicesOpenGL indices, const float* verticesLinhas, unsigned i
 
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indices.EBO);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(linhasIndices), linhasIndices, GL_STATIC_DRAW);
+
+    if(verticesLinhas == nullptr || numLinhas == 0){
+        // position attribute
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+        glEnableVertexAttribArray(0);
+    }
+
+    numLinhas = nLinhas;
 }
 
 void freeIndicesOpenGL(IndicesOpenGL* indicesOpenGL){
@@ -332,4 +340,20 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos){
 // ----------------------------------------------------------------------
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset){
     camera.ProcessMouseScroll(float(yoffset));
+}
+
+float float_rand( float min, float max ){
+    float scale = rand() / (float) RAND_MAX; /* [0, 1.0] */
+    return min + scale * ( max - min );      /* [min, max] */
+}
+
+template <typename T>
+T* addToArray(T* array, int size, T newValue){
+    auto newArray = (T*)malloc(sizeof(T)*(size + 1));
+    for(int i = 0; i < size; i++){
+        newArray[i] = array[i];
+    }
+    newArray[size] = newValue;
+    free(array);
+    return newArray;
 }
