@@ -11,12 +11,12 @@ uniform int numPosVisiveis;
 uniform vec2 posVisiveis[MAX_POS_VISIVEIS];
 
 bool equal(float x, float y);
-bool mod(float x, float y);
+bool modulo(float x, float y);
 bool isPosVisivel(vec2 coord);
 
 void main()
 {
-    if(mod(TexCoord.x, tamanhoQuadrado) || mod(TexCoord.y, tamanhoQuadrado)){
+    if(modulo(TexCoord.x, tamanhoQuadrado) || modulo(TexCoord.y, tamanhoQuadrado)){
         FragColor = vec4(1.0, 0.0, 0.0, 1.0);
     }else if(isPosVisivel(TexCoord)){
         FragColor = vec4(1.0, 1.0, 0.0, 1.0);
@@ -29,7 +29,7 @@ bool equal(float x, float y){
     return abs(x - y) < EPSILON;
 }
 
-bool mod(float x, float y){
+bool modulo(float x, float y){
     if(y > 0) {
         while(x > 0){
             x -= y;
