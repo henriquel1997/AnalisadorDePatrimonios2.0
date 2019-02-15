@@ -12,3 +12,5 @@ template <typename T>
 void addTo(Lista<T>* lista, T newValue);
 template <typename T>
 void addTo(Lista<T>* dest, Lista<T>* source);
+template <typename T>
+void freeLista(Lista<T> *lista);

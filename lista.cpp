@@ -35,3 +35,8 @@ void addTo(Lista<T>* dest, Lista<T>* source){
     dest->array = newArray;
     dest->size = novoTamanho;
 }
+
+template <typename T>
+void freeLista(Lista<T> *lista){
+    free(lista->array);
+}

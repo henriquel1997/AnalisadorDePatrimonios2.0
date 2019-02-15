@@ -35,7 +35,7 @@ struct Mesh {
 };
 
 struct Model{
-    int nMeshes;
+    unsigned int nMeshes;
     Mesh* meshes;
 
     const char* directory;

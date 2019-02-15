@@ -15,12 +15,12 @@
 using namespace glm;
 
 struct BoundingBox{
-    float min;
-    float max;
+    vec3 min;
+    vec3 max;
 };
 
 struct Patrimonio {
-    int id;
+    unsigned int id;
     Mesh mesh;
     BoundingBox bBox;
 };
@@ -31,6 +31,17 @@ struct IndicesOpenGL{
     unsigned int EBO;
 };
 
+struct Ray {
+    vec3 position;
+    vec3 direction;
+};
+
+struct RayHitInfo {
+    bool hit;
+    float distance;
+    vec3 point;
+};
+
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void mouse_callback(GLFWwindow* window, double xpos, double ypos);
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
@@ -38,8 +49,14 @@ void processInput(GLFWwindow *window);
 IndicesOpenGL inicializarGrid();
 IndicesOpenGL inicializarLinhas();
 void updateLinhas(IndicesOpenGL indices, const float* verticesLinhas, unsigned int nLinhas);
+void updatePontosVisiveisChao(Shader* shader);
 void freeIndicesOpenGL(IndicesOpenGL* indicesOpenGL);
 float float_rand( float min, float max);
+RayHitInfo RayHitMesh (Ray* raio, Mesh* mesh);
+bool isPatrimonioTheClosestHit(Patrimonio* patrimonio, Ray* raio);
+void inicializarPatrimonios(Model modelo);
+Patrimonio* getPatrimonio(unsigned int index);
+void algoritmoVisibilidade(IndicesOpenGL indicesLinhas);
 
 // settings
 const unsigned int SCR_WIDTH = 800;
@@ -58,7 +75,23 @@ float lastFrame = 0.0f;
 vec3 posPessoa(0.f, .1f, 0.f);
 unsigned int numLinhas = 0;
 
+//Algoritmo de Visibilidade
+int tamanhoGrid = -1;
+int nPontosPatrimonio = -1;
+unsigned int passoAlgoritmo = 0;
+unsigned int numeroQuadradosLinha = 20;
+float fov = 15.f;
+unsigned int raiosPorPonto = 500;
+bool executaAlgoritmo = false;
+bool avancarAlgoritmo = false; //Passo a passo
+bool animado = true;
+bool mostrarRaios = false;
+
 Lista<Patrimonio> patrimonios;
+unsigned int numPontosVisiveisChao = 0;
+vec2* pontosVisiveisChao = nullptr;
+int patrimonioIndex = -1;
+float* pontosPatrimonio = nullptr;
 
 int main(){
     // glfw: initialize and configure
@@ -114,9 +147,10 @@ int main(){
     Shader gridShader(R"(../shader/gridshader.vs)", R"(../shader/gridshader.fs)");
     Shader linhasShader(R"(../shader/lineshader.vs)", R"(../shader/lineshader.fs)");
 
-    //Carregando o modelo
+    //Carregando o modelo e inicializando os Patrimônios
     //Model modelo = loadModel(R"(../model/CentroFortaleza.fbx)");
     Model modelo = loadModel(R"(../model/centro.obj)");
+    inicializarPatrimonios(modelo);
 
     // render loop
     // -----------
@@ -152,8 +186,7 @@ int main(){
         gridShader.setMat4("view", view);
         gridShader.setMat4("model", model);
         gridShader.setFloat("tamanhoQuadrado", 0.5);
-        //gridShader.setInt("numPosVisiveis", 1);
-        //gridShader.setVec2("posVisiveis[0]", 0.f, 0.f);
+        updatePontosVisiveisChao(&gridShader);
 
         glBindVertexArray(gridIndices.VAO);
         glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
@@ -201,11 +234,64 @@ int main(){
     freeModel(&modelo);
     freeIndicesOpenGL(&gridIndices);
     freeIndicesOpenGL(&linhasIndices);
+    freeLista(&patrimonios);
+    free(pontosVisiveisChao);
+    free(pontosPatrimonio);
 
     // glfw: terminate, clearing all previously allocated GLFW resources.
     // ------------------------------------------------------------------
     glfwTerminate();
     return 0;
+}
+
+void inicializarPatrimonios(Model modelo){
+    patrimonios.size = modelo.nMeshes;
+    patrimonios.array = (Patrimonio*)malloc(sizeof(Patrimonio)*patrimonios.size);
+    for(unsigned int i = 0; i < patrimonios.size; i++){
+        Patrimonio p = {};
+        p.id = i;
+        p.mesh = modelo.meshes[i];
+
+        vec3 min(3.40282347E+38f);
+        vec3 max(- 3.40282347E+38f);
+
+        for(unsigned int j = 0; j < p.mesh.nVertices; j++){
+            vec3 vertice = p.mesh.vertices[j].Position;
+
+            if(vertice.x > max.x){
+                max.x = vertice.x;
+            }
+            if(vertice.y > max.y){
+                max.y = vertice.y;
+            }
+            if(vertice.z > max.z){
+                max.z = vertice.z;
+            }
+
+            if(vertice.x < min.x){
+                min.x = vertice.x;
+            }
+            if(vertice.y < min.y){
+                min.y = vertice.y;
+            }
+            if(vertice.z < min.z){
+                min.z = vertice.z;
+            }
+        }
+
+        p.bBox = (BoundingBox){min, max};
+
+        patrimonios.array[i] = p;
+    }
+}
+
+Patrimonio* getPatrimonio(unsigned int index){
+    //TODO: Deixar genérico para caso o patrimônio seja removido
+    Patrimonio* p = nullptr;
+    if(index < patrimonios.size){
+        p = &patrimonios.array[index];
+    }
+    return p;
 }
 
 IndicesOpenGL inicializarGrid(){
@@ -299,11 +385,138 @@ void updateLinhas(IndicesOpenGL indices, const float* verticesLinhas, unsigned i
 
     numLinhas = nLinhas;
 }
+void updatePontosVisiveisChao(Shader* shader){
+    shader->setInt("numPosVisiveis", numPontosVisiveisChao);
+    char* s = (char*)malloc(sizeof(char)*10);
+    for(unsigned int i = 0; i < numPontosVisiveisChao; i++){
+        vec2 ponto = pontosVisiveisChao[i];
+        sprintf(s, "posVisiveis[%i]", i);
+        shader->setVec2(s, ponto.x, ponto.y);
+    }
+    free(s);
+}
 
 void freeIndicesOpenGL(IndicesOpenGL* indicesOpenGL){
     glDeleteVertexArrays(1, &indicesOpenGL->VAO);
     glDeleteBuffers(1, &indicesOpenGL->VBO);
     glDeleteBuffers(1, &indicesOpenGL->EBO);
+}
+
+void algoritmoVisibilidade(IndicesOpenGL indicesLinhas){
+    if(patrimonioIndex >= 0 && tamanhoGrid > 0 && nPontosPatrimonio > 0 && pontosPatrimonio != nullptr) {
+
+//        if(passoAlgoritmo == 0){
+//            tempoInicio = time(nullptr);
+//        }
+
+        //bool seguindoPessoa = cameraSeguindoPessoa();
+
+        float tamanhoQuadrado = float(tamanhoGrid)/numeroQuadradosLinha;
+        float metadeGrid = tamanhoGrid/2.f;
+        float metadeQuadrado = tamanhoQuadrado/2.f;
+        int numeroQuadradosTotal = numeroQuadradosLinha*numeroQuadradosLinha;
+        Patrimonio* patrimonio = getPatrimonio(patrimonioIndex);
+
+        if(passoAlgoritmo == 0 && pontosVisiveisChao != nullptr){
+            free(pontosVisiveisChao);
+            pontosVisiveisChao = (vec2*) malloc(sizeof(vec2) * numeroQuadradosTotal);
+        }
+
+        for (int i = passoAlgoritmo; i < numeroQuadradosTotal; i++) {
+
+            //Definindo a posição da pessoa na grid
+            int quadradoX = i/numeroQuadradosLinha;
+            int quadradoY = i%numeroQuadradosLinha;
+            posPessoa.x = quadradoX*tamanhoQuadrado - metadeGrid + metadeQuadrado;
+            posPessoa.z = quadradoY*tamanhoQuadrado - metadeGrid + metadeQuadrado;
+
+            //TODO: Checar se está dentro de um patrimônio
+//            if(estaDentroDeUmPatrimonio()){
+//                passoAlgoritmo++;
+//                continue;
+//            }
+
+            //Calculando a visibilidade
+            unsigned int numRaios = 0;
+            auto raios = (float*)malloc(sizeof(float) * 3 * raiosPorPonto * nPontosPatrimonio);
+            for(unsigned int j = 0; j < 3 * nPontosPatrimonio; j += 3){
+                vec3 ponto(pontosPatrimonio[i], pontosPatrimonio[i+1], pontosPatrimonio[i+2]);
+                vec3 up (0.0f, 1.0f, 0.0f);
+                vec3 visao = ponto - posPessoa;
+                vec3 vetorHorizontal = normalize(cross(up, visao));
+                vec3 vetorVertical = normalize(cross(visao, vetorHorizontal));
+                float fovMul = length(visao)*cos(fov/2);
+                vetorHorizontal = vetorHorizontal * fovMul;
+                vetorVertical = vetorVertical * fovMul;
+
+                unsigned int cont = 0;
+                for(unsigned int k = 0; k < raiosPorPonto; k++){
+                    vec3 vx = vetorHorizontal * float_rand(-1.f, 1.f);
+                    vec3 vy = vetorVertical * float_rand(-1.f, 1.f);
+                    vec3 pontoRaio = (vx + vy) * ponto;
+
+                    Ray raio;
+                    raio.position = posPessoa;
+                    raio.direction = pontoRaio + posPessoa;
+
+
+                    bool acertou = false;
+                    if(isPatrimonioTheClosestHit(patrimonio, &raio)){
+                        cont++;
+                        acertou = true;
+                    }
+
+                    raios[numRaios * 3 + 0] = raio.position.x;
+                    raios[numRaios * 3 + 1] = raio.position.y;
+                    raios[numRaios * 3 + 2] = raio.position.z;
+                    numRaios++;
+
+                    if(acertou){
+                        break;
+                    }
+                }
+
+                if(cont > 0){
+                    vec2 novoPonto = {(float)quadradoX, (float)quadradoY};
+                    bool achou = false;
+                    for(unsigned int k = 0; k < numPontosVisiveisChao; k++){
+                        vec2 pontoChao = pontosVisiveisChao[k];
+                        if(pontoChao.x == novoPonto.x &&
+                           pontoChao.y == novoPonto.y){
+                            achou = true;
+                            break;
+                        }
+                    }
+                    if(!achou){
+                        pontosVisiveisChao[numPontosVisiveisChao++] = novoPonto;
+                    }
+                }
+            }
+
+            //Incrementado o passo e verificando se é necessário continuar executando o algoritmo
+            passoAlgoritmo++;
+
+            if(i == numeroQuadradosTotal - 1){
+
+                //auto tempoFim = time(nullptr);
+
+                executaAlgoritmo = false;
+
+                printf("Pontos Visiveis:\n");
+                for(unsigned int j = 0; j < numPontosVisiveisChao; j++) {
+                    vec2 ponto = pontosVisiveisChao[j];
+                    printf("%f, %f\n", ponto.x, ponto.y);
+                }
+
+                //printf("Tempo algoritmo: %f(s)\n", difftime(tempoFim, tempoInicio));
+            }
+
+            if(animado || avancarAlgoritmo){
+                avancarAlgoritmo = false;
+                break;
+            }
+        }
+    }
 }
 
 // process all input: query GLFW whether relevant keys are pressed/released this frame and react accordingly
@@ -357,4 +570,71 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset){
 float float_rand( float min, float max ){
     float scale = rand() / (float) RAND_MAX; /* [0, 1.0] */
     return min + scale * ( max - min );      /* [min, max] */
+}
+
+//Baseado em: https://en.wikipedia.org/wiki/M%C3%B6ller%E2%80%93Trumbore_intersection_algorithm
+RayHitInfo RayHitMesh (Ray* raio, Mesh* mesh){
+
+    const float EPSILON = 0.0000001;
+    vec3 edge1, edge2, h, s, q;
+    float a,f,u,v;
+
+    RayHitInfo hitInfo = {};
+    hitInfo.hit = false;
+    hitInfo.point = vec3();
+    hitInfo.distance = 3.40282347E+38f;
+
+    for(unsigned int i = 0; i < mesh->nIndices; i += 3){
+        vec3 vertex0 = mesh->vertices[mesh->indices[i + 0]].Position;
+        vec3 vertex1 = mesh->vertices[mesh->indices[i + 1]].Position;
+        vec3 vertex2 = mesh->vertices[mesh->indices[i + 2]].Position;
+
+        edge1 = vertex1 - vertex0;
+        edge2 = vertex2 - vertex0;
+        h = cross(raio->direction, edge2);
+        a = dot(edge1, h);
+        if (a > -EPSILON && a < EPSILON)
+            continue;   // This ray is parallel to this triangle.
+        f = 1.f/a;
+        s = raio->position - vertex0;
+        u = f * (dot(s, h));
+        if (u < 0.0 || u > 1.0)
+            continue;
+        q = cross(s, edge1);
+        v = f * dot(raio->position, q);
+        if (v < 0.0 || u + v > 1.0)
+            continue;
+        // At this stage we can compute t to find out where the intersection point is on the line.
+        float t = f * dot(edge2, q);
+        if (t > EPSILON) // ray intersection
+        {
+            vec3 hitPoint = raio->position + raio->direction * t;
+            float distance = length(hitPoint - raio->position);
+            if(distance < hitInfo.distance){
+                hitInfo.hit = true;
+                hitInfo.point = hitPoint;
+                hitInfo.distance = distance;
+            }
+        }
+        else // This means that there is a line intersection but not a ray intersection.
+            continue;
+    }
+
+    return hitInfo;
+}
+
+bool isPatrimonioTheClosestHit(Patrimonio* patrimonio, Ray* raio){
+    unsigned int closestId = 0;
+    float closestDistance = 3.40282347E+38f;
+    for(unsigned int i = 0; i < patrimonios.size; i++){
+        //TODO: Checar a interseção com a bounding box
+        auto p = patrimonios.array[i];
+        auto hitInfo = RayHitMesh(raio, &p.mesh);
+        if(hitInfo.hit && hitInfo.distance < closestDistance){
+            closestId = p.id;
+            closestDistance = hitInfo.distance;
+        }
+    }
+
+    return closestDistance < 3.40282347E+38f && closestId == patrimonio->id;
 }
