@@ -14,6 +14,13 @@
 
 using namespace glm;
 
+struct IndicesOpenGL{
+    unsigned int VAO;
+    unsigned int VBO;
+    unsigned int EBO;
+    unsigned int numIndices;
+};
+
 struct BoundingBox{
     vec3 min;
     vec3 max;
@@ -23,12 +30,7 @@ struct Patrimonio {
     unsigned int id;
     Mesh mesh;
     BoundingBox bBox;
-};
-
-struct IndicesOpenGL{
-    unsigned int VAO;
-    unsigned int VBO;
-    unsigned int EBO;
+    IndicesOpenGL indices;
 };
 
 struct Ray {
@@ -42,13 +44,19 @@ struct RayHitInfo {
     vec3 point;
 };
 
+struct Vertice {
+    float x;
+    float y;
+    float z;
+};
+
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void mouse_callback(GLFWwindow* window, double xpos, double ypos);
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 void processInput(GLFWwindow *window);
 IndicesOpenGL inicializarGrid();
 IndicesOpenGL inicializarLinhas();
-void updateLinhas(IndicesOpenGL indices, const float* verticesLinhas, unsigned int nLinhas);
+void updateRaios(IndicesOpenGL* indicesGL, const float *verticesRaio, unsigned int nRaios);
 void updatePontosVisiveisChao(Shader* shader);
 void freeIndicesOpenGL(IndicesOpenGL* indicesOpenGL);
 float float_rand( float min, float max);
@@ -57,6 +65,7 @@ bool isPatrimonioTheClosestHit(Patrimonio* patrimonio, Ray* raio);
 void inicializarPatrimonios(Model modelo);
 Patrimonio* getPatrimonio(unsigned int index);
 void algoritmoVisibilidade(IndicesOpenGL indicesLinhas);
+void inicializarBoundingBoxPatrimonios();
 
 // settings
 const unsigned int SCR_WIDTH = 800;
@@ -73,24 +82,24 @@ float deltaTime = 0.0f;
 float lastFrame = 0.0f;
 
 vec3 posPessoa(0.f, .1f, 0.f);
-unsigned int numLinhas = 0;
 
 //Algoritmo de Visibilidade
-int tamanhoGrid = -1;
-int nPontosPatrimonio = -1;
-unsigned int passoAlgoritmo = 0;
+unsigned int patrimonioIndex = 0;
+float tamanhoLinhaGrid = -1.f;
 unsigned int numeroQuadradosLinha = 20;
+unsigned int passoAlgoritmo = 0;
 float fov = 15.f;
 unsigned int raiosPorPonto = 500;
 bool executaAlgoritmo = false;
 bool avancarAlgoritmo = false; //Passo a passo
 bool animado = true;
 bool mostrarRaios = false;
+bool mostrarBoundingBox = true;
 
 Lista<Patrimonio> patrimonios;
 unsigned int numPontosVisiveisChao = 0;
 vec2* pontosVisiveisChao = nullptr;
-int patrimonioIndex = -1;
+unsigned int nPontosPatrimonio = 0;
 float* pontosPatrimonio = nullptr;
 
 int main(){
@@ -128,12 +137,6 @@ int main(){
         return -1;
     }
 
-    //Grid
-    auto gridIndices = inicializarGrid();
-
-    //Linhas
-    auto linhasIndices = inicializarLinhas();
-
     // configure global opengl state
     // -----------------------------
     glEnable(GL_DEPTH_TEST);
@@ -146,11 +149,19 @@ int main(){
     Shader lightingShader(R"(../shader/shader.vs)", R"(../shader/shader_no_texture.fs)");
     Shader gridShader(R"(../shader/gridshader.vs)", R"(../shader/gridshader.fs)");
     Shader linhasShader(R"(../shader/lineshader.vs)", R"(../shader/lineshader.fs)");
+    Shader bBoxShader(R"(../shader/bboxshader.vs)", R"(../shader/bboxshader.fs)");
 
     //Carregando o modelo e inicializando os Patrimônios
     //Model modelo = loadModel(R"(../model/CentroFortaleza.fbx)");
     Model modelo = loadModel(R"(../model/centro.obj)");
     inicializarPatrimonios(modelo);
+    inicializarBoundingBoxPatrimonios();
+
+    //Grid
+    auto gridIndices = inicializarGrid();
+
+    //Linhas
+    auto linhasIndices = inicializarLinhas();
 
     // render loop
     // -----------
@@ -164,13 +175,17 @@ int main(){
         // input
         // -----
         processInput(window);
+        if(executaAlgoritmo){
+            algoritmoVisibilidade(linhasIndices);
+        }
 
+        ///Raios Aleatórios
 //        unsigned int nLinhas = 60000;
 //        float novasLinhas[nLinhas*3];
 //        for(unsigned int i = 0; i < nLinhas*3; i++){
 //            novasLinhas[i] = float_rand(-1.f, 1.f);
 //        }
-//        updateLinhas(linhasIndices, novasLinhas, nLinhas);
+//        updateRaios(&linhasIndices, novasLinhas, nLinhas);
 
         // render
         // ------
@@ -189,7 +204,7 @@ int main(){
         updatePontosVisiveisChao(&gridShader);
 
         glBindVertexArray(gridIndices.VAO);
-        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+        glDrawElements(GL_TRIANGLES, gridIndices.numIndices, GL_UNSIGNED_INT, 0);
 
         // be sure to activate shader when setting uniforms/drawing objects
         lightingShader.use();
@@ -221,7 +236,20 @@ int main(){
         linhasShader.setMat4("view", view);
         linhasShader.setMat4("model", model);
         glBindVertexArray(linhasIndices.VAO);
-        glDrawElements(GL_LINES, (numLinhas + 1)*2, GL_UNSIGNED_INT, 0);
+        glDrawElements(GL_LINES, linhasIndices.numIndices, GL_UNSIGNED_INT, 0);
+
+        if(mostrarBoundingBox){
+            bBoxShader.use();
+            bBoxShader.setMat4("projection", projection);
+            bBoxShader.setMat4("view", view);
+            bBoxShader.setMat4("model", model);
+            for(int i = 0; i < patrimonios.size; i++){
+                Patrimonio p = patrimonios.array[i];
+                bBoxShader.setBool("selecionado", patrimonioIndex == p.id);
+                glBindVertexArray(p.indices.VAO);
+                glDrawElements(GL_LINES, p.indices.numIndices, GL_UNSIGNED_INT, 0);
+            }
+        }
 
         // glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
         // -------------------------------------------------------------------------------
@@ -234,7 +262,10 @@ int main(){
     freeModel(&modelo);
     freeIndicesOpenGL(&gridIndices);
     freeIndicesOpenGL(&linhasIndices);
-    freeLista(&patrimonios);
+    for(int i = 0; i < patrimonios.size; i++){
+        freeIndicesOpenGL(&patrimonios.array[i].indices);
+    }
+    //freeLista(&patrimonios);
     free(pontosVisiveisChao);
     free(pontosPatrimonio);
 
@@ -249,7 +280,7 @@ void inicializarPatrimonios(Model modelo){
     patrimonios.array = (Patrimonio*)malloc(sizeof(Patrimonio)*patrimonios.size);
     for(unsigned int i = 0; i < patrimonios.size; i++){
         Patrimonio p = {};
-        p.id = i;
+        p.id = i+1;
         p.mesh = modelo.meshes[i];
 
         vec3 min(3.40282347E+38f);
@@ -295,12 +326,15 @@ Patrimonio* getPatrimonio(unsigned int index){
 }
 
 IndicesOpenGL inicializarGrid(){
+    tamanhoLinhaGrid = 1.f;
+    float metadeGrid = tamanhoLinhaGrid/2;
+
     float gridVertices[] = {
             // positions          // texture coords
-            0.5f,  0.0f,  0.5f,  1.0f, 1.0f, // top right
-            0.5f,  0.0f, -0.5f,  1.0f, 0.0f, // bottom right
-            -0.5f,  0.0f, -0.5f,  0.0f, 0.0f, // bottom left
-            -0.5f,  0.0f,  0.5f,  0.0f, 1.0f  // top left
+            metadeGrid,  0.0f,  metadeGrid,  1.0f, 1.0f, // top right
+            metadeGrid,  0.0f, -metadeGrid,  1.0f, 0.0f, // bottom right
+            -metadeGrid,  0.0f, -metadeGrid,  0.0f, 0.0f, // bottom left
+            -metadeGrid,  0.0f,  metadeGrid,  0.0f, 1.0f  // top left
     };
     for(int i = 0; i < 5*5; i++)
         gridVertices[i] *= 5.f;
@@ -328,7 +362,7 @@ IndicesOpenGL inicializarGrid(){
     glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
     glEnableVertexAttribArray(1);
 
-    return (IndicesOpenGL){gridVAO, gridVBO, gridEBO};
+    return (IndicesOpenGL){gridVAO, gridVBO, gridEBO, 6};
 }
 
 IndicesOpenGL inicializarLinhas(){
@@ -343,47 +377,52 @@ IndicesOpenGL inicializarLinhas(){
 
     auto linhasIndices = (IndicesOpenGL){linhaVAO, linhaVBO, linhaEBO};
 
-    updateLinhas(linhasIndices, nullptr, 0);
+    updateRaios(&linhasIndices, nullptr, 0);
 
     return linhasIndices;
 }
 
-void updateLinhas(IndicesOpenGL indices, const float* verticesLinhas, unsigned int nLinhas){
+void updateRaios(IndicesOpenGL* indicesGL,
+                 const float *verticesRaio,
+                 unsigned int nRaios){
 
-    float linhasVertices[3*(nLinhas+2)];
-    linhasVertices[0] = posPessoa.x;
-    linhasVertices[1] = posPessoa.y;
-    linhasVertices[2] = posPessoa.z;
-    linhasVertices[3] = posPessoa.x;
-    linhasVertices[4] = 0.f;
-    linhasVertices[5] = posPessoa.z;
-    for(unsigned int i = 0; i < 3*nLinhas; i++){
-        linhasVertices[6 + i] = verticesLinhas[i];
+    int tamanhoVertices = 3*(nRaios+ 2);
+    float vertices[tamanhoVertices];
+    vertices[0] = posPessoa.x;
+    vertices[1] = posPessoa.y;
+    vertices[2] = posPessoa.z;
+    vertices[3] = posPessoa.x;
+    vertices[4] = 0.f;
+    vertices[5] = posPessoa.z;
+    for(unsigned int i = 0; i < 3*nRaios; i++){
+        vertices[6 + i] = verticesRaio[i];
     }
 
-    unsigned int linhasIndices[2*(nLinhas + 1)];
-    linhasIndices[0] = 0;
-    linhasIndices[1] = 1;
-    for(unsigned int i = 0; i < nLinhas; i++){
-        linhasIndices[2 + (i*2)] = 0;
-        linhasIndices[3 + (i*2)] = 2 + i;
+    unsigned int tamanhoIndice = 2 * (1 + nRaios);
+    unsigned int indices[tamanhoIndice];
+    indices[0] = 0;
+    indices[1] = 1;
+    for(unsigned int i = 0; i < nRaios; i++){
+        indices[2 + (i*2)] = 0;
+        indices[3 + (i*2)] = 2 + i;
     }
 
-    glBindVertexArray(indices.VAO);
+    glBindVertexArray(indicesGL->VAO);
 
-    glBindBuffer(GL_ARRAY_BUFFER, indices.VBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(linhasVertices), linhasVertices, GL_STATIC_DRAW);
+    glBindBuffer(GL_ARRAY_BUFFER, indicesGL->VBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
 
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indices.EBO);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(linhasIndices), linhasIndices, GL_STATIC_DRAW);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indicesGL->EBO);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
 
-    if(verticesLinhas == nullptr || numLinhas == 0){
+    if(verticesRaio == nullptr || tamanhoIndice == 0){
         // position attribute
         glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
         glEnableVertexAttribArray(0);
     }
 
-    numLinhas = nLinhas;
+    //indicesGL->numIndices = nRaios + 1;
+    indicesGL->numIndices = tamanhoIndice;
 }
 void updatePontosVisiveisChao(Shader* shader){
     shader->setInt("numPosVisiveis", numPontosVisiveisChao);
@@ -402,8 +441,107 @@ void freeIndicesOpenGL(IndicesOpenGL* indicesOpenGL){
     glDeleteBuffers(1, &indicesOpenGL->EBO);
 }
 
+void inicializarBoundingBoxPatrimonios() {
+    for(unsigned int i = 0; i < patrimonios.size; i++){
+        Vertice vertices[8];
+        unsigned int tamanhoIndice = 24;
+        unsigned int indices[tamanhoIndice];
+
+        Patrimonio* p = &patrimonios.array[i];
+        float xSize = p->bBox.max.x - p->bBox.min.x;
+        float ySize = p->bBox.max.y - p->bBox.min.y;
+        float zSize = p->bBox.max.z - p->bBox.min.z;
+        //Min
+        vertices[0] = (Vertice){p->bBox.min.x, p->bBox.min.y, p->bBox.min.z};
+        //Below Min
+        vertices[1] = (Vertice){p->bBox.min.x, p->bBox.min.y + ySize, p->bBox.min.z};
+        //Min - X
+        vertices[2] = (Vertice){p->bBox.min.x + xSize, p->bBox.min.y, p->bBox.min.z};
+        //Max - Z
+        vertices[3] = (Vertice){p->bBox.max.x, p->bBox.max.y, p->bBox.max.z - zSize};
+        //Min - Z
+        vertices[4] = (Vertice){p->bBox.min.x, p->bBox.min.y, p->bBox.min.z + zSize};
+        //Max - X
+        vertices[5] = (Vertice){p->bBox.max.x - xSize, p->bBox.max.y, p->bBox.max.z};
+        //Max
+        vertices[6] = (Vertice){p->bBox.max.x, p->bBox.max.y, p->bBox.max.z};
+        //Below Max
+        vertices[7] = (Vertice){p->bBox.max.x, p->bBox.max.y - ySize, p->bBox.max.z};
+
+        //0, 1
+        //2, 3
+        //4, 5
+        //6, 7
+
+        indices[0] = 0;
+        indices[1] = 1;
+
+        indices[2] = 2;
+        indices[3] = 3;
+
+        indices[4] = 4;
+        indices[5] = 5;
+
+        indices[6] = 6;
+        indices[7] = 7;
+
+        //0, 2
+        //0, 4
+        //6, 5
+        //6, 3
+
+        indices[8] = 0;
+        indices[9] = 2;
+
+        indices[10] = 0;
+        indices[11] = 4;
+
+        indices[12] = 6;
+        indices[13] = 5;
+
+        indices[14] = 6;
+        indices[15] = 3;
+
+        //2, 7
+        //4, 7
+        //5, 1
+        //3, 1
+
+        indices[16] = 2;
+        indices[17] = 7;
+
+        indices[18] = 4;
+        indices[19] = 7;
+
+        indices[20] = 5;
+        indices[21] = 1;
+
+        indices[22] = 3;
+        indices[23] = 1;
+
+        unsigned int VBO, VAO, EBO;
+
+        glGenVertexArrays(1, &VAO);
+        glGenBuffers(1, &VBO);
+        glGenBuffers(1, &EBO);
+
+        glBindVertexArray(VAO);
+
+        glBindBuffer(GL_ARRAY_BUFFER, VBO);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+        glEnableVertexAttribArray(0);
+
+        p->indices = (IndicesOpenGL){VAO, VBO, EBO, tamanhoIndice};
+    }
+}
+
 void algoritmoVisibilidade(IndicesOpenGL indicesLinhas){
-    if(patrimonioIndex >= 0 && tamanhoGrid > 0 && nPontosPatrimonio > 0 && pontosPatrimonio != nullptr) {
+    if(patrimonioIndex >= 0 && tamanhoLinhaGrid > 0 && nPontosPatrimonio > 0 && pontosPatrimonio != nullptr) {
 
 //        if(passoAlgoritmo == 0){
 //            tempoInicio = time(nullptr);
@@ -411,8 +549,8 @@ void algoritmoVisibilidade(IndicesOpenGL indicesLinhas){
 
         //bool seguindoPessoa = cameraSeguindoPessoa();
 
-        float tamanhoQuadrado = float(tamanhoGrid)/numeroQuadradosLinha;
-        float metadeGrid = tamanhoGrid/2.f;
+        float tamanhoQuadrado = float(tamanhoLinhaGrid)/numeroQuadradosLinha;
+        float metadeGrid = tamanhoLinhaGrid/2.f;
         float metadeQuadrado = tamanhoQuadrado/2.f;
         int numeroQuadradosTotal = numeroQuadradosLinha*numeroQuadradosLinha;
         Patrimonio* patrimonio = getPatrimonio(patrimonioIndex);
@@ -519,9 +657,92 @@ void algoritmoVisibilidade(IndicesOpenGL indicesLinhas){
     }
 }
 
+//vec3 unproject(vec3 source, mat4 proj, mat4 view){
+//    vec3 result(0.0f, 0.0f, 0.0f);
+//
+//    // Calculate unproject matrix (multiply view patrix by projection matrix) and invert it
+//    mat4 matViewProj = inverse(view * proj);
+//
+//    // Create quaternion from source point
+//    vec4 quat(1.0f, source.x, source.y, source.z);
+//
+//    // Multiply quat point by unproject matrix
+//    vec4 multX = quat * matViewProj[0];
+//    vec4 multY = quat * matViewProj[1];
+//    vec4 multZ = quat * matViewProj[2];
+//    vec4 multW = quat * matViewProj[3];
+//    quat.x = multX.x + multX.y + multX.z + multX.w;
+//    quat.y = multY.x + multY.y + multY.z + multY.w;
+//    quat.z = multZ.x + multZ.y + multZ.z + multZ.w;
+//    quat.w = multW.x + multW.y + multW.z + multW.w;
+//
+//    // Normalized world points in vectors
+//    result.x = quat.x/quat.w;
+//    result.y = quat.y/quat.w;
+//    result.z = quat.z/quat.w;
+//
+//    return result;
+//}
+
+Ray getMouseRay(float mouseX, float mouseY, Camera camera){
+    Ray raio = {};
+    raio.position = camera.Position;
+
+    mat4 view = camera.GetViewMatrix();
+    mat4 proj = perspective(radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
+
+    mat4 invVP = inverse(proj * view);
+    vec4 screenPos = vec4(mouseX, -mouseY, 1.0f, 1.0f);
+    vec4 worldPos = invVP * screenPos;
+
+    raio.direction = normalize(vec3(worldPos));
+
+//    vec3 deviceCoords((2.0f*mousePosition.x)/(float)SCR_WIDTH - 1.0f,
+//                      1.0f - (2.0f*mousePosition.y)/(float)SCR_HEIGHT,
+//                      1.0f);
+//
+//    mat4 view = camera.GetViewMatrix();
+//    mat4 proj = perspective(radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
+//
+//    //vec3 nearPoint = unproject(deviceCoords.x, deviceCoords.y, 0.0f), proj, view);
+//    //vec3 farPoint = rlUnproject((Vector3){ deviceCoords.x, deviceCoords.y, 1.0f }, proj, view);
+//
+//    vec4 viewPort(0, 0, SCR_WIDTH, SCR_HEIGHT);
+//    vec3 nearPoint = unProject(vec3(deviceCoords.x, deviceCoords.y, 0.0f), mat4(1.0f), view*proj, viewPort);
+//    vec3 farPoint = unProject(vec3(deviceCoords.x, deviceCoords.y, 1.0f), mat4(1.0f), view*proj, viewPort);
+//
+//    vec3 direction = normalize(farPoint - nearPoint);
+
+    return raio;
+}
+
+void selecionarPatrimonio(){
+    float x = lastX/SCR_WIDTH;
+    float y = lastY/SCR_HEIGHT;
+    Ray raio = getMouseRay(x, y, camera);
+
+    unsigned int menorIndex = 0;
+    float menorDist = 3.40282347E+38f;
+    for(unsigned int i = 0; i < patrimonios.size; i++){
+        Patrimonio p = patrimonios.array[i];
+        auto hitInfo = RayHitMesh(&raio, &p.mesh);
+        if(hitInfo.hit && hitInfo.distance < menorDist){
+            menorIndex = p.id;
+            menorDist = hitInfo.distance;
+        }
+    }
+
+    if(menorDist < 3.40282347E+38f){
+        patrimonioIndex = menorIndex;
+    }
+}
+
 // process all input: query GLFW whether relevant keys are pressed/released this frame and react accordingly
 // ---------------------------------------------------------------------------------------------------------
 void processInput(GLFWwindow *window){
+    if (glfwGetKey(window, GLFW_KEY_ENTER) == GLFW_PRESS)
+        executaAlgoritmo = true;
+
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
         glfwSetWindowShouldClose(window, true);
 
@@ -533,6 +754,14 @@ void processInput(GLFWwindow *window){
         camera.ProcessKeyboard(LEFT, deltaTime);
     if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
         camera.ProcessKeyboard(RIGHT, deltaTime);
+
+    if(glfwGetKey(window, GLFW_KEY_B) == GLFW_PRESS)
+        mostrarBoundingBox = !mostrarBoundingBox;
+
+    if(glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS){
+        selecionarPatrimonio();
+        printf("Index: %u\n", patrimonioIndex);
+    }
 }
 
 // glfw: whenever the window size changed (by OS or user resize) this callback function executes
@@ -573,11 +802,61 @@ float float_rand( float min, float max ){
 }
 
 //Baseado em: https://en.wikipedia.org/wiki/M%C3%B6ller%E2%80%93Trumbore_intersection_algorithm
+//RayHitInfo RayHitMesh (Ray* raio, Mesh* mesh){
+//
+//    const float EPSILON = 0.0000001;
+//    vec3 edge1, edge2, h, s, q;
+//    float a,f,u,v;
+//
+//    RayHitInfo hitInfo = {};
+//    hitInfo.hit = false;
+//    hitInfo.point = vec3();
+//    hitInfo.distance = 3.40282347E+38f;
+//
+//    for(unsigned int i = 0; i < mesh->nIndices; i += 3){
+//        vec3 vertex0 = mesh->vertices[mesh->indices[i + 0]].Position;
+//        vec3 vertex1 = mesh->vertices[mesh->indices[i + 1]].Position;
+//        vec3 vertex2 = mesh->vertices[mesh->indices[i + 2]].Position;
+//
+//        edge1 = vertex1 - vertex0;
+//        edge2 = vertex2 - vertex0;
+//        h = cross(raio->direction, edge2);
+//        a = dot(edge1, h);
+//        if (a > -EPSILON && a < EPSILON)
+//            continue;   // This ray is parallel to this triangle.
+//        f = 1.f/a;
+//        s = raio->position - vertex0;
+//        u = f * (dot(s, h));
+//        if (u < 0.0 || u > 1.0)
+//            continue;
+//        q = cross(s, edge1);
+//        v = f * dot(raio->position, q);
+//        if (v < 0.0 || u + v > 1.0)
+//            continue;
+//        // At this stage we can compute t to find out where the intersection point is on the line.
+//        float t = f * dot(edge2, q);
+//        if (t > EPSILON) // ray intersection
+//        {
+//            vec3 hitPoint = raio->position + raio->direction * t;
+//            float distance = length(hitPoint - raio->position);
+//            if(distance < hitInfo.distance){
+//                hitInfo.hit = true;
+//                hitInfo.point = hitPoint;
+//                hitInfo.distance = distance;
+//            }
+//        }
+//        else // This means that there is a line intersection but not a ray intersection.
+//            continue;
+//    }
+//
+//    return hitInfo;
+//}
+
 RayHitInfo RayHitMesh (Ray* raio, Mesh* mesh){
 
     const float EPSILON = 0.0000001;
-    vec3 edge1, edge2, h, s, q;
-    float a,f,u,v;
+    vec3 edge1, edge2, p, q, tv;
+    float det, invDet, u, v, t;
 
     RayHitInfo hitInfo = {};
     hitInfo.hit = false;
@@ -591,33 +870,47 @@ RayHitInfo RayHitMesh (Ray* raio, Mesh* mesh){
 
         edge1 = vertex1 - vertex0;
         edge2 = vertex2 - vertex0;
-        h = cross(raio->direction, edge2);
-        a = dot(edge1, h);
-        if (a > -EPSILON && a < EPSILON)
-            continue;   // This ray is parallel to this triangle.
-        f = 1.f/a;
-        s = raio->position - vertex0;
-        u = f * (dot(s, h));
-        if (u < 0.0 || u > 1.0)
+
+        // Begin calculating determinant - also used to calculate u parameter
+        p = cross(raio->direction, edge2);
+
+        // If determinant is near zero, ray lies in plane of triangle or ray is parallel to plane of triangle
+        det = dot(edge1, p);
+
+        // Avoid culling!
+        if ((det > -EPSILON) && (det < EPSILON))
             continue;
-        q = cross(s, edge1);
-        v = f * dot(raio->position, q);
-        if (v < 0.0 || u + v > 1.0)
+
+        invDet = 1.0f/det;
+
+        //Calculate distance from V0 to ray origin
+        tv = raio->position - vertex0;
+
+        //Calculate u parameter and test bound
+        u = dot(tv, p)*invDet;
+
+        // The intersection lies outside of the triangle
+        if ((u < 0.0f) || (u > 1.0f))
             continue;
-        // At this stage we can compute t to find out where the intersection point is on the line.
-        float t = f * dot(edge2, q);
-        if (t > EPSILON) // ray intersection
-        {
-            vec3 hitPoint = raio->position + raio->direction * t;
-            float distance = length(hitPoint - raio->position);
-            if(distance < hitInfo.distance){
-                hitInfo.hit = true;
-                hitInfo.point = hitPoint;
-                hitInfo.distance = distance;
-            }
+
+        // Prepare to test v parameter
+        q = cross(tv, edge1);
+
+        // Calculate V parameter and test bound
+        v = dot(raio->direction, q)*invDet;
+
+        // The intersection lies outside of the triangle
+        if ((v < 0.0f) || ((u + v) > 1.0f)) continue;
+
+        t = dot(edge2, q)*invDet;
+
+        if (t > EPSILON && t < hitInfo.distance){
+            // Ray hit, get hit point and normal
+            hitInfo.hit = true;
+            hitInfo.distance = t;
+            //Normal: Vector3Normalize(Vector3CrossProduct(edge1, edge2));
+            hitInfo.point = raio->position + (raio->direction * t);
         }
-        else // This means that there is a line intersection but not a ray intersection.
-            continue;
     }
 
     return hitInfo;
