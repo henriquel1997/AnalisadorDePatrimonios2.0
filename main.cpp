@@ -56,7 +56,7 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 void processInput(GLFWwindow *window);
 IndicesOpenGL inicializarGrid();
 IndicesOpenGL inicializarLinhas();
-void updateRaios(IndicesOpenGL* indicesGL, const float *verticesRaio, unsigned int nRaios);
+void updateRaios(IndicesOpenGL* indicesGL, const float *verticesRaio = nullptr, unsigned int nRaios = 0);
 void updatePontosVisiveisChao(Shader* shader);
 void freeIndicesOpenGL(IndicesOpenGL* indicesOpenGL);
 float float_rand( float min, float max);
@@ -64,7 +64,7 @@ RayHitInfo RayHitMesh (Ray* raio, Mesh* mesh);
 bool isPatrimonioTheClosestHit(Patrimonio* patrimonio, Ray* raio);
 void inicializarPatrimonios(Model modelo);
 Patrimonio* getPatrimonio(unsigned int index);
-void algoritmoVisibilidade(IndicesOpenGL indicesLinhas);
+void algoritmoVisibilidade(IndicesOpenGL* indicesLinhas);
 void inicializarBoundingBoxPatrimonios();
 
 // settings
@@ -89,7 +89,7 @@ float tamanhoLinhaGrid = -1.f;
 unsigned int numeroQuadradosLinha = 20;
 unsigned int passoAlgoritmo = 0;
 float fov = 15.f;
-unsigned int raiosPorPonto = 500;
+unsigned int raiosPorPonto = 100;
 bool executaAlgoritmo = false;
 bool avancarAlgoritmo = false; //Passo a passo
 bool animado = true;
@@ -100,7 +100,7 @@ Lista<Patrimonio> patrimonios;
 unsigned int numPontosVisiveisChao = 0;
 vec2* pontosVisiveisChao = nullptr;
 unsigned int nPontosPatrimonio = 0;
-float* pontosPatrimonio = nullptr;
+Vertice* pontosPatrimonio = nullptr;
 
 int main(){
     // glfw: initialize and configure
@@ -176,7 +176,7 @@ int main(){
         // -----
         processInput(window);
         if(executaAlgoritmo){
-            algoritmoVisibilidade(linhasIndices);
+            algoritmoVisibilidade(&linhasIndices);
         }
 
         ///Raios Aleatórios
@@ -200,7 +200,7 @@ int main(){
         gridShader.setMat4("projection", projection);
         gridShader.setMat4("view", view);
         gridShader.setMat4("model", model);
-        gridShader.setFloat("tamanhoQuadrado", 0.5);
+        gridShader.setFloat("tamanhoQuadrado", tamanhoLinhaGrid/numeroQuadradosLinha);
         updatePontosVisiveisChao(&gridShader);
 
         glBindVertexArray(gridIndices.VAO);
@@ -320,7 +320,7 @@ Patrimonio* getPatrimonio(unsigned int index){
     //TODO: Deixar genérico para caso o patrimônio seja removido
     Patrimonio* p = nullptr;
     if(index < patrimonios.size){
-        p = &patrimonios.array[index];
+        p = &patrimonios.array[index-1];
     }
     return p;
 }
@@ -336,12 +336,17 @@ IndicesOpenGL inicializarGrid(){
             -metadeGrid,  0.0f, -metadeGrid,  0.0f, 0.0f, // bottom left
             -metadeGrid,  0.0f,  metadeGrid,  0.0f, 1.0f  // top left
     };
+
+    float mult = 5.f;
+    tamanhoLinhaGrid *= mult;
     for(int i = 0; i < 5*5; i++)
         gridVertices[i] *= 5.f;
+
     unsigned int gridIndices[] = {
             0, 1, 3, // first triangle
             1, 2, 3  // second triangle
     };
+
     unsigned int gridVBO, gridVAO, gridEBO;
     glGenVertexArrays(1, &gridVAO);
     glGenBuffers(1, &gridVBO);
@@ -426,7 +431,7 @@ void updateRaios(IndicesOpenGL* indicesGL,
 }
 void updatePontosVisiveisChao(Shader* shader){
     shader->setInt("numPosVisiveis", numPontosVisiveisChao);
-    char* s = (char*)malloc(sizeof(char)*10);
+    char* s = (char*)malloc(sizeof(char)*20);
     for(unsigned int i = 0; i < numPontosVisiveisChao; i++){
         vec2 ponto = pontosVisiveisChao[i];
         sprintf(s, "posVisiveis[%i]", i);
@@ -540,25 +545,21 @@ void inicializarBoundingBoxPatrimonios() {
     }
 }
 
-void algoritmoVisibilidade(IndicesOpenGL indicesLinhas){
+void algoritmoVisibilidade(IndicesOpenGL* indicesLinhas){
     if(patrimonioIndex >= 0 && tamanhoLinhaGrid > 0 && nPontosPatrimonio > 0 && pontosPatrimonio != nullptr) {
 
-//        if(passoAlgoritmo == 0){
-//            tempoInicio = time(nullptr);
-//        }
-
-        //bool seguindoPessoa = cameraSeguindoPessoa();
-
-        float tamanhoQuadrado = float(tamanhoLinhaGrid)/numeroQuadradosLinha;
+        float tamanhoQuadrado = tamanhoLinhaGrid/numeroQuadradosLinha;
         float metadeGrid = tamanhoLinhaGrid/2.f;
         float metadeQuadrado = tamanhoQuadrado/2.f;
         int numeroQuadradosTotal = numeroQuadradosLinha*numeroQuadradosLinha;
         Patrimonio* patrimonio = getPatrimonio(patrimonioIndex);
 
         if(passoAlgoritmo == 0 && pontosVisiveisChao != nullptr){
+            numPontosVisiveisChao = 0;
             free(pontosVisiveisChao);
-            pontosVisiveisChao = (vec2*) malloc(sizeof(vec2) * numeroQuadradosTotal);
         }
+
+        pontosVisiveisChao = (vec2*) malloc(sizeof(vec2) * numeroQuadradosTotal);
 
         for (int i = passoAlgoritmo; i < numeroQuadradosTotal; i++) {
 
@@ -576,9 +577,9 @@ void algoritmoVisibilidade(IndicesOpenGL indicesLinhas){
 
             //Calculando a visibilidade
             unsigned int numRaios = 0;
-            auto raios = (float*)malloc(sizeof(float) * 3 * raiosPorPonto * nPontosPatrimonio);
-            for(unsigned int j = 0; j < 3 * nPontosPatrimonio; j += 3){
-                vec3 ponto(pontosPatrimonio[i], pontosPatrimonio[i+1], pontosPatrimonio[i+2]);
+            Vertice raios[raiosPorPonto * nPontosPatrimonio];
+            for(unsigned int j = 0; j < nPontosPatrimonio; j++){
+                vec3 ponto(pontosPatrimonio[j].x, pontosPatrimonio[j].y, pontosPatrimonio[j].z);
                 vec3 up (0.0f, 1.0f, 0.0f);
                 vec3 visao = ponto - posPessoa;
                 vec3 vetorHorizontal = normalize(cross(up, visao));
@@ -593,7 +594,7 @@ void algoritmoVisibilidade(IndicesOpenGL indicesLinhas){
                     vec3 vy = vetorVertical * float_rand(-1.f, 1.f);
                     vec3 pontoRaio = (vx + vy) * ponto;
 
-                    Ray raio;
+                    Ray raio = {};
                     raio.position = posPessoa;
                     raio.direction = pontoRaio + posPessoa;
 
@@ -604,10 +605,9 @@ void algoritmoVisibilidade(IndicesOpenGL indicesLinhas){
                         acertou = true;
                     }
 
-                    raios[numRaios * 3 + 0] = raio.position.x;
-                    raios[numRaios * 3 + 1] = raio.position.y;
-                    raios[numRaios * 3 + 2] = raio.position.z;
-                    numRaios++;
+                    if(mostrarRaios){
+                        raios[numRaios++] = (Vertice){pontoRaio.x, pontoRaio.y, pontoRaio.z};
+                    }
 
                     if(acertou){
                         break;
@@ -631,12 +631,16 @@ void algoritmoVisibilidade(IndicesOpenGL indicesLinhas){
                 }
             }
 
+            if(mostrarRaios){
+                updateRaios(indicesLinhas, &raios[0].x, numRaios);
+            }else{
+                updateRaios(indicesLinhas);
+            }
+
             //Incrementado o passo e verificando se é necessário continuar executando o algoritmo
             passoAlgoritmo++;
 
             if(i == numeroQuadradosTotal - 1){
-
-                //auto tempoFim = time(nullptr);
 
                 executaAlgoritmo = false;
 
@@ -645,8 +649,6 @@ void algoritmoVisibilidade(IndicesOpenGL indicesLinhas){
                     vec2 ponto = pontosVisiveisChao[j];
                     printf("%f, %f\n", ponto.x, ponto.y);
                 }
-
-                //printf("Tempo algoritmo: %f(s)\n", difftime(tempoFim, tempoInicio));
             }
 
             if(animado || avancarAlgoritmo){
@@ -656,33 +658,6 @@ void algoritmoVisibilidade(IndicesOpenGL indicesLinhas){
         }
     }
 }
-
-//vec3 unproject(vec3 source, mat4 proj, mat4 view){
-//    vec3 result(0.0f, 0.0f, 0.0f);
-//
-//    // Calculate unproject matrix (multiply view patrix by projection matrix) and invert it
-//    mat4 matViewProj = inverse(view * proj);
-//
-//    // Create quaternion from source point
-//    vec4 quat(1.0f, source.x, source.y, source.z);
-//
-//    // Multiply quat point by unproject matrix
-//    vec4 multX = quat * matViewProj[0];
-//    vec4 multY = quat * matViewProj[1];
-//    vec4 multZ = quat * matViewProj[2];
-//    vec4 multW = quat * matViewProj[3];
-//    quat.x = multX.x + multX.y + multX.z + multX.w;
-//    quat.y = multY.x + multY.y + multY.z + multY.w;
-//    quat.z = multZ.x + multZ.y + multZ.z + multZ.w;
-//    quat.w = multW.x + multW.y + multW.z + multW.w;
-//
-//    // Normalized world points in vectors
-//    result.x = quat.x/quat.w;
-//    result.y = quat.y/quat.w;
-//    result.z = quat.z/quat.w;
-//
-//    return result;
-//}
 
 Ray getMouseRay(float mouseX, float mouseY, Camera camera){
     Ray raio = {};
@@ -721,19 +696,25 @@ void selecionarPatrimonio(){
     float y = lastY/SCR_HEIGHT;
     Ray raio = getMouseRay(x, y, camera);
 
-    unsigned int menorIndex = 0;
+    Patrimonio* menor = nullptr;
     float menorDist = 3.40282347E+38f;
     for(unsigned int i = 0; i < patrimonios.size; i++){
-        Patrimonio p = patrimonios.array[i];
-        auto hitInfo = RayHitMesh(&raio, &p.mesh);
+        Patrimonio* p = &patrimonios.array[i];
+        auto hitInfo = RayHitMesh(&raio, &p->mesh);
         if(hitInfo.hit && hitInfo.distance < menorDist){
-            menorIndex = p.id;
+            menor = p;
             menorDist = hitInfo.distance;
         }
     }
 
-    if(menorDist < 3.40282347E+38f){
-        patrimonioIndex = menorIndex;
+    if(menor != nullptr){
+        patrimonioIndex = menor->id;
+        nPontosPatrimonio = menor->mesh.nVertices;
+        pontosPatrimonio = (Vertice*)malloc(sizeof(Vertice) * nPontosPatrimonio);
+        for(unsigned int i = 0; i < nPontosPatrimonio; i++){
+            vec3 v = menor->mesh.vertices[i].Position;
+            pontosPatrimonio[i] = (Vertice){v.x, v.y, v.z};
+        }
     }
 }
 

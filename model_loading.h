@@ -23,9 +23,9 @@ struct Texture {
 };
 
 struct Mesh {
-    int nVertices;
-    int nIndices;
-    int nTextures;
+    unsigned int nVertices;
+    unsigned int nIndices;
+    unsigned int nTextures;
 
     Vertex* vertices;
     unsigned int* indices;
