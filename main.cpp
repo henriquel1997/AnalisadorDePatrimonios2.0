@@ -116,7 +116,7 @@ int main(){
 
     // glfw window creation
     // --------------------
-    GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "LearnOpenGL", nullptr, nullptr);
+    GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "Analisador", nullptr, nullptr);
     if (window == nullptr){
         printf("Failed to create GLFW window\n");
         glfwTerminate();
@@ -615,7 +615,7 @@ void algoritmoVisibilidade(IndicesOpenGL* indicesLinhas){
                 }
 
                 if(cont > 0){
-                    vec2 novoPonto = {(float)quadradoX, (float)quadradoY};
+                    vec2 novoPonto(quadradoX, quadradoY);
                     bool achou = false;
                     for(unsigned int k = 0; k < numPontosVisiveisChao; k++){
                         vec2 pontoChao = pontosVisiveisChao[k];
@@ -897,16 +897,68 @@ RayHitInfo RayHitMesh (Ray* raio, Mesh* mesh){
     return hitInfo;
 }
 
+//https://www.scratchapixel.com/lessons/3d-basic-rendering/minimal-ray-tracer-rendering-simple-shapes/ray-box-intersection
+bool intersect(Ray* raio, BoundingBox* box){
+    float tmin = (box->min.x - raio->position.x) / raio->direction.x;
+    float tmax = (box->max.x - raio->position.x) / raio->direction.x;
+
+    if (tmin > tmax){
+        float aux = tmin;
+        tmin = tmax;
+        tmax = aux;
+    }
+
+    float tymin = (box->min.y - raio->position.y) / raio->direction.y;
+    float tymax = (box->max.y - raio->position.y) / raio->direction.y;
+
+    if (tymin > tymax){
+        float aux = tymin;
+        tymin = tymax;
+        tymax = aux;
+    }
+
+    if ((tmin > tymax) || (tymin > tmax))
+        return false;
+
+    if (tymin > tmin)
+        tmin = tymin;
+
+    if (tymax < tmax)
+        tmax = tymax;
+
+    float tzmin = (box->min.z - raio->position.z) / raio->direction.z;
+    float tzmax = (box->max.z - raio->position.z) / raio->direction.z;
+
+    if (tzmin > tzmax){
+        float aux = tzmin;
+        tzmin = tzmax;
+        tzmax = aux;
+    }
+
+    if ((tmin > tzmax) || (tzmin > tmax))
+        return false;
+
+//    if (tzmin > tmin)
+//        tmin = tzmin;
+//
+//    if (tzmax < tmax)
+//        tmax = tzmax;
+
+    return true;
+}
+
 bool isPatrimonioTheClosestHit(Patrimonio* patrimonio, Ray* raio){
     unsigned int closestId = 0;
     float closestDistance = 3.40282347E+38f;
     for(unsigned int i = 0; i < patrimonios.size; i++){
         //TODO: Checar a interseção com a bounding box
         auto p = patrimonios.array[i];
-        auto hitInfo = RayHitMesh(raio, &p.mesh);
-        if(hitInfo.hit && hitInfo.distance < closestDistance){
-            closestId = p.id;
-            closestDistance = hitInfo.distance;
+        if(intersect(raio, &p.bBox)){
+            auto hitInfo = RayHitMesh(raio, &p.mesh);
+            if(hitInfo.hit && hitInfo.distance < closestDistance){
+                closestId = p.id;
+                closestDistance = hitInfo.distance;
+            }
         }
     }
 
