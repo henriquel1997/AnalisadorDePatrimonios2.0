@@ -50,6 +50,11 @@ struct Vertice {
     float z;
 };
 
+struct Vertice2D {
+    float x;
+    float y;
+};
+
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void mouse_callback(GLFWwindow* window, double xpos, double ypos);
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
@@ -93,12 +98,12 @@ unsigned int raiosPorPonto = 100;
 bool executaAlgoritmo = false;
 bool avancarAlgoritmo = false; //Passo a passo
 bool animado = true;
-bool mostrarRaios = false;
+bool mostrarRaios = true;
 bool mostrarBoundingBox = true;
 
 Lista<Patrimonio> patrimonios;
 unsigned int numPontosVisiveisChao = 0;
-vec2* pontosVisiveisChao = nullptr;
+Vertice2D* pontosVisiveisChao = nullptr;
 unsigned int nPontosPatrimonio = 0;
 Vertice* pontosPatrimonio = nullptr;
 
@@ -166,6 +171,9 @@ int main(){
     // render loop
     // -----------
     while (!glfwWindowShouldClose(window)){
+        glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
         // per-frame time logic
         // --------------------
         auto currentFrame = float(glfwGetTime());
@@ -189,8 +197,6 @@ int main(){
 
         // render
         // ------
-        glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         mat4 projection = perspective(radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
         mat4 view       = camera.GetViewMatrix();
@@ -426,14 +432,13 @@ void updateRaios(IndicesOpenGL* indicesGL,
         glEnableVertexAttribArray(0);
     }
 
-    //indicesGL->numIndices = nRaios + 1;
     indicesGL->numIndices = tamanhoIndice;
 }
 void updatePontosVisiveisChao(Shader* shader){
     shader->setInt("numPosVisiveis", numPontosVisiveisChao);
     char* s = (char*)malloc(sizeof(char)*20);
     for(unsigned int i = 0; i < numPontosVisiveisChao; i++){
-        vec2 ponto = pontosVisiveisChao[i];
+        Vertice2D ponto = pontosVisiveisChao[i];
         sprintf(s, "posVisiveis[%i]", i);
         shader->setVec2(s, ponto.x, ponto.y);
     }
@@ -545,6 +550,43 @@ void inicializarBoundingBoxPatrimonios() {
     }
 }
 
+void desenharLinhaUnica(vec3 inicio, vec3 fim){
+    unsigned int VBO, VAO, EBO;
+
+    glGenVertexArrays(1, &VAO);
+    glGenBuffers(1, &VBO);
+    glGenBuffers(1, &EBO);
+
+    glBindVertexArray(VAO);
+
+    float vertices[] = {
+            inicio.x, inicio.y, inicio.z,
+            fim.x, fim.y, fim.z
+    };
+
+    unsigned int indices[]{
+        0, 1
+    };
+
+    glBindVertexArray(VAO);
+
+    glBindBuffer(GL_ARRAY_BUFFER, VBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+
+    // position attribute
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
+
+    glDrawElements(GL_LINES, 2, GL_UNSIGNED_INT, 0);
+
+    glDeleteVertexArrays(1, &VAO);
+    glDeleteBuffers(1, &VBO);
+    glDeleteBuffers(1, &EBO);
+}
+
 void algoritmoVisibilidade(IndicesOpenGL* indicesLinhas){
     if(patrimonioIndex >= 0 && tamanhoLinhaGrid > 0 && nPontosPatrimonio > 0 && pontosPatrimonio != nullptr) {
 
@@ -554,12 +596,13 @@ void algoritmoVisibilidade(IndicesOpenGL* indicesLinhas){
         int numeroQuadradosTotal = numeroQuadradosLinha*numeroQuadradosLinha;
         Patrimonio* patrimonio = getPatrimonio(patrimonioIndex);
 
-        if(passoAlgoritmo == 0 && pontosVisiveisChao != nullptr){
+        if(passoAlgoritmo == 0){
             numPontosVisiveisChao = 0;
-            free(pontosVisiveisChao);
+            if(pontosVisiveisChao != nullptr){
+                free(pontosVisiveisChao);
+            }
+            pontosVisiveisChao = (Vertice2D*) malloc(sizeof(Vertice2D) * numeroQuadradosTotal);
         }
-
-        pontosVisiveisChao = (vec2*) malloc(sizeof(vec2) * numeroQuadradosTotal);
 
         for (int i = passoAlgoritmo; i < numeroQuadradosTotal; i++) {
 
@@ -592,11 +635,11 @@ void algoritmoVisibilidade(IndicesOpenGL* indicesLinhas){
                 for(unsigned int k = 0; k < raiosPorPonto; k++){
                     vec3 vx = vetorHorizontal * float_rand(-1.f, 1.f);
                     vec3 vy = vetorVertical * float_rand(-1.f, 1.f);
-                    vec3 pontoRaio = (vx + vy) * ponto;
+                    vec3 pontoRaio = vx + vy + ponto;
 
                     Ray raio = {};
                     raio.position = posPessoa;
-                    raio.direction = pontoRaio + posPessoa;
+                    raio.direction = pontoRaio - posPessoa;
 
 
                     bool acertou = false;
@@ -615,10 +658,10 @@ void algoritmoVisibilidade(IndicesOpenGL* indicesLinhas){
                 }
 
                 if(cont > 0){
-                    vec2 novoPonto(quadradoX, quadradoY);
+                    Vertice2D novoPonto {(float)quadradoX, (float)quadradoY};
                     bool achou = false;
                     for(unsigned int k = 0; k < numPontosVisiveisChao; k++){
-                        vec2 pontoChao = pontosVisiveisChao[k];
+                        Vertice2D pontoChao = pontosVisiveisChao[k];
                         if(pontoChao.x == novoPonto.x &&
                            pontoChao.y == novoPonto.y){
                             achou = true;
@@ -646,7 +689,7 @@ void algoritmoVisibilidade(IndicesOpenGL* indicesLinhas){
 
                 printf("Pontos Visiveis:\n");
                 for(unsigned int j = 0; j < numPontosVisiveisChao; j++) {
-                    vec2 ponto = pontosVisiveisChao[j];
+                    Vertice2D ponto = pontosVisiveisChao[j];
                     printf("%f, %f\n", ponto.x, ponto.y);
                 }
             }
@@ -662,32 +705,7 @@ void algoritmoVisibilidade(IndicesOpenGL* indicesLinhas){
 Ray getMouseRay(float mouseX, float mouseY, Camera camera){
     Ray raio = {};
     raio.position = camera.Position;
-
-    mat4 view = camera.GetViewMatrix();
-    mat4 proj = perspective(radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
-
-    mat4 invVP = inverse(proj * view);
-    vec4 screenPos = vec4(mouseX, -mouseY, 1.0f, 1.0f);
-    vec4 worldPos = invVP * screenPos;
-
-    raio.direction = normalize(vec3(worldPos));
-
-//    vec3 deviceCoords((2.0f*mousePosition.x)/(float)SCR_WIDTH - 1.0f,
-//                      1.0f - (2.0f*mousePosition.y)/(float)SCR_HEIGHT,
-//                      1.0f);
-//
-//    mat4 view = camera.GetViewMatrix();
-//    mat4 proj = perspective(radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
-//
-//    //vec3 nearPoint = unproject(deviceCoords.x, deviceCoords.y, 0.0f), proj, view);
-//    //vec3 farPoint = rlUnproject((Vector3){ deviceCoords.x, deviceCoords.y, 1.0f }, proj, view);
-//
-//    vec4 viewPort(0, 0, SCR_WIDTH, SCR_HEIGHT);
-//    vec3 nearPoint = unProject(vec3(deviceCoords.x, deviceCoords.y, 0.0f), mat4(1.0f), view*proj, viewPort);
-//    vec3 farPoint = unProject(vec3(deviceCoords.x, deviceCoords.y, 1.0f), mat4(1.0f), view*proj, viewPort);
-//
-//    vec3 direction = normalize(farPoint - nearPoint);
-
+    raio.direction = camera.Front;
     return raio;
 }
 
@@ -721,8 +739,10 @@ void selecionarPatrimonio(){
 // process all input: query GLFW whether relevant keys are pressed/released this frame and react accordingly
 // ---------------------------------------------------------------------------------------------------------
 void processInput(GLFWwindow *window){
-    if (glfwGetKey(window, GLFW_KEY_ENTER) == GLFW_PRESS)
+    if (glfwGetKey(window, GLFW_KEY_ENTER) == GLFW_PRESS){
         executaAlgoritmo = true;
+        passoAlgoritmo = 0;
+    }
 
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
         glfwSetWindowShouldClose(window, true);
@@ -783,56 +803,6 @@ float float_rand( float min, float max ){
 }
 
 //Baseado em: https://en.wikipedia.org/wiki/M%C3%B6ller%E2%80%93Trumbore_intersection_algorithm
-//RayHitInfo RayHitMesh (Ray* raio, Mesh* mesh){
-//
-//    const float EPSILON = 0.0000001;
-//    vec3 edge1, edge2, h, s, q;
-//    float a,f,u,v;
-//
-//    RayHitInfo hitInfo = {};
-//    hitInfo.hit = false;
-//    hitInfo.point = vec3();
-//    hitInfo.distance = 3.40282347E+38f;
-//
-//    for(unsigned int i = 0; i < mesh->nIndices; i += 3){
-//        vec3 vertex0 = mesh->vertices[mesh->indices[i + 0]].Position;
-//        vec3 vertex1 = mesh->vertices[mesh->indices[i + 1]].Position;
-//        vec3 vertex2 = mesh->vertices[mesh->indices[i + 2]].Position;
-//
-//        edge1 = vertex1 - vertex0;
-//        edge2 = vertex2 - vertex0;
-//        h = cross(raio->direction, edge2);
-//        a = dot(edge1, h);
-//        if (a > -EPSILON && a < EPSILON)
-//            continue;   // This ray is parallel to this triangle.
-//        f = 1.f/a;
-//        s = raio->position - vertex0;
-//        u = f * (dot(s, h));
-//        if (u < 0.0 || u > 1.0)
-//            continue;
-//        q = cross(s, edge1);
-//        v = f * dot(raio->position, q);
-//        if (v < 0.0 || u + v > 1.0)
-//            continue;
-//        // At this stage we can compute t to find out where the intersection point is on the line.
-//        float t = f * dot(edge2, q);
-//        if (t > EPSILON) // ray intersection
-//        {
-//            vec3 hitPoint = raio->position + raio->direction * t;
-//            float distance = length(hitPoint - raio->position);
-//            if(distance < hitInfo.distance){
-//                hitInfo.hit = true;
-//                hitInfo.point = hitPoint;
-//                hitInfo.distance = distance;
-//            }
-//        }
-//        else // This means that there is a line intersection but not a ray intersection.
-//            continue;
-//    }
-//
-//    return hitInfo;
-//}
-
 RayHitInfo RayHitMesh (Ray* raio, Mesh* mesh){
 
     const float EPSILON = 0.0000001;
@@ -897,7 +867,7 @@ RayHitInfo RayHitMesh (Ray* raio, Mesh* mesh){
     return hitInfo;
 }
 
-//https://www.scratchapixel.com/lessons/3d-basic-rendering/minimal-ray-tracer-rendering-simple-shapes/ray-box-intersection
+//Baseado em: https://www.scratchapixel.com/lessons/3d-basic-rendering/minimal-ray-tracer-rendering-simple-shapes/ray-box-intersection
 bool intersect(Ray* raio, BoundingBox* box){
     float tmin = (box->min.x - raio->position.x) / raio->direction.x;
     float tmax = (box->max.x - raio->position.x) / raio->direction.x;
@@ -937,12 +907,6 @@ bool intersect(Ray* raio, BoundingBox* box){
 
     if ((tmin > tzmax) || (tzmin > tmax))
         return false;
-
-//    if (tzmin > tmin)
-//        tmin = tzmin;
-//
-//    if (tzmax < tmax)
-//        tmax = tzmax;
 
     return true;
 }

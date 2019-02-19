@@ -40,9 +40,16 @@ bool modulo(float x, float y){
 }
 
 bool isPosVisivel(vec2 coord){
+
+    int nQuadrados = int(1 / tamanhoQuadrado);
+
     for(int i = 0; i < numPosVisiveis; i++){
-        vec2 pos = floor(posVisiveis[i]);
-        if(pos == floor(coord) && coord.x < pos.x + tamanhoQuadrado && coord.y < pos.y + tamanhoQuadrado){
+        vec2 pos = posVisiveis[i] / nQuadrados;
+
+        if(coord.x >= pos.x &&
+           coord.x < pos.x + tamanhoQuadrado &&
+           coord.y >= pos.y &&
+           coord.y < pos.y + tamanhoQuadrado){
             return true;
         }
     }
