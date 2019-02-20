@@ -2,6 +2,9 @@
 // Created by Henrique on 10/02/2019.
 //
 
+#ifndef MODEL_LOADING
+#define MODEL_LOADING
+
 #include <assimp/cimport.h>        // Plain-C interface
 #include <assimp/scene.h>          // Output data structure
 #include <assimp/postprocess.h>    // Post processing flags
@@ -50,3 +53,5 @@ Mesh processMesh(aiMesh *aiMesh, const aiScene *scene, const char* directory);
 void processNode(Model* model, aiNode *node, const aiScene *scene);
 Model loadModel(const char* filepath);
 void freeModel(Model* model);
+
+#endif
