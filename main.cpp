@@ -22,7 +22,7 @@ void processInput(GLFWwindow *window);
 IndicesOpenGL inicializarGrid();
 IndicesOpenGL inicializarLinhas();
 void updateRaios(IndicesOpenGL* indicesGL, const float *verticesRaio = nullptr, unsigned int nRaios = 0);
-void updatePontosVisiveisChao(Shader* shader);
+void gerarTexturaPontosVisiveis(unsigned int textureID);
 void freeIndicesOpenGL(IndicesOpenGL* indicesOpenGL);
 float float_rand( float min, float max);
 bool isPatrimonioTheClosestHit(Patrimonio* patrimonio, Ray* raio);
@@ -51,7 +51,7 @@ vec3 posPessoa(0.f, .1f, 0.f);
 //Algoritmo de Visibilidade
 unsigned int patrimonioIndex = 0;
 float tamanhoLinhaGrid = -1.f;
-unsigned int numeroQuadradosLinha = 20;
+unsigned int numeroQuadradosLinha = 50;
 unsigned int passoAlgoritmo = 0;
 float fov = 15.f;
 unsigned int raiosPorPonto = 100;
@@ -113,6 +113,7 @@ int main(){
 
     Shader lightingShader(R"(../shader/shader.vs)", R"(../shader/shader_no_texture.fs)");
     Shader gridShader(R"(../shader/gridshader.vs)", R"(../shader/gridshader.fs)");
+    gridShader.setInt("texture1", 0);
     Shader linhasShader(R"(../shader/lineshader.vs)", R"(../shader/lineshader.fs)");
     Shader bBoxShader(R"(../shader/bboxshader.vs)", R"(../shader/bboxshader.fs)");
 
@@ -155,11 +156,13 @@ int main(){
         mat4 model      = mat4(1.0f);
 
         gridShader.use();
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, gridIndices.texture);
         gridShader.setMat4("projection", projection);
         gridShader.setMat4("view", view);
         gridShader.setMat4("model", model);
         gridShader.setFloat("tamanhoQuadrado", tamanhoLinhaGrid/numeroQuadradosLinha);
-        updatePontosVisiveisChao(&gridShader);
+        gerarTexturaPontosVisiveis(gridIndices.texture);
 
         glBindVertexArray(gridIndices.VAO);
         glDrawElements(GL_TRIANGLES, gridIndices.numIndices, GL_UNSIGNED_INT, 0);
@@ -283,6 +286,32 @@ Patrimonio* getPatrimonio(unsigned int index){
     return p;
 }
 
+void gerarTexturaPontosVisiveis(unsigned int textureID){
+    struct Color{
+        unsigned char r;
+        unsigned char g;
+        unsigned char b;
+        unsigned char a;
+    };
+
+
+    Color data[numeroQuadradosLinha][numeroQuadradosLinha];
+    for(unsigned int i = 0; i < numeroQuadradosLinha; i++)
+        for(unsigned int j = 0; j < numeroQuadradosLinha; j++)
+            data[i][j] = (Color){ 0, 0, 0, 255};
+
+
+    for(unsigned int i = 0; i < numPontosVisiveisChao; i++){
+        Vertice2D ponto = pontosVisiveisChao[i];
+        auto x = (unsigned int)ponto.x;
+        auto y = (unsigned int)ponto.y;
+        data[y][x] = (Color){ 255, 255, 0, 255};
+    }
+
+    glBindTexture(GL_TEXTURE_2D, textureID);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, numeroQuadradosLinha, numeroQuadradosLinha, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+}
+
 IndicesOpenGL inicializarGrid(){
     tamanhoLinhaGrid = 1.f;
     float metadeGrid = tamanhoLinhaGrid/2;
@@ -325,7 +354,24 @@ IndicesOpenGL inicializarGrid(){
     glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
     glEnableVertexAttribArray(1);
 
-    return (IndicesOpenGL){gridVAO, gridVBO, gridEBO, 6};
+    //Texture init
+    unsigned int textureID;
+    glGenTextures(1, &textureID);
+    gerarTexturaPontosVisiveis(textureID);
+    glGenerateMipmap(GL_TEXTURE_2D);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    IndicesOpenGL indice = {};
+    indice.numIndices = 6;
+    indice.VAO = gridVAO;
+    indice.VBO = gridVBO;
+    indice.EBO = gridEBO;
+    indice.texture = textureID;
+
+    return indice;
 }
 
 IndicesOpenGL inicializarLinhas(){
@@ -338,7 +384,11 @@ IndicesOpenGL inicializarLinhas(){
 
     glBindVertexArray(linhaVAO);
 
-    auto linhasIndices = (IndicesOpenGL){linhaVAO, linhaVBO, linhaEBO};
+    IndicesOpenGL linhasIndices;
+    linhasIndices.numIndices = 0;
+    linhasIndices.VAO = linhaVAO;
+    linhasIndices.VBO = linhaVBO;
+    linhasIndices.EBO = linhaEBO;
 
     updateRaios(&linhasIndices, nullptr, 0);
 
@@ -385,16 +435,6 @@ void updateRaios(IndicesOpenGL* indicesGL,
     }
 
     indicesGL->numIndices = tamanhoIndice;
-}
-void updatePontosVisiveisChao(Shader* shader){
-    shader->setInt("numPosVisiveis", numPontosVisiveisChao);
-    char* s = (char*)malloc(sizeof(char)*20);
-    for(unsigned int i = 0; i < numPontosVisiveisChao; i++){
-        Vertice2D ponto = pontosVisiveisChao[i];
-        sprintf(s, "posVisiveis[%i]", i);
-        shader->setVec2(s, ponto.x, ponto.y);
-    }
-    free(s);
 }
 
 void inicializarBoundingBoxPatrimonios() {
@@ -492,7 +532,13 @@ void inicializarBoundingBoxPatrimonios() {
         glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
         glEnableVertexAttribArray(0);
 
-        p->indices = (IndicesOpenGL){VAO, VBO, EBO, tamanhoIndice};
+        IndicesOpenGL indice;
+        indice.VAO = VAO;
+        indice.VBO = VBO;
+        indice.EBO = EBO;
+        indice.numIndices = tamanhoIndice;
+
+        p->indices = indice;
     }
 }
 

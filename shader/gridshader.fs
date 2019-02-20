@@ -1,4 +1,4 @@
-#version 330 core
+#version 430 core
 out vec4 FragColor;
 
 in vec2 TexCoord;
@@ -6,22 +6,21 @@ in vec2 TexCoord;
 #define EPSILON 0.01
 #define MAX_POS_VISIVEIS 1022
 
+uniform sampler2D texture1;
+
 uniform float tamanhoQuadrado;
-uniform int numPosVisiveis;
-uniform vec2 posVisiveis[MAX_POS_VISIVEIS];
 
 bool equal(float x, float y);
 bool modulo(float x, float y);
-bool isPosVisivel(vec2 coord);
+vec2 remainder(vec2 v1, ivec2 v2);
 
 void main()
 {
     if(modulo(TexCoord.x, tamanhoQuadrado) || modulo(TexCoord.y, tamanhoQuadrado)){
         FragColor = vec4(1.0, 0.0, 0.0, 1.0);
-    }else if(isPosVisivel(TexCoord)){
-        FragColor = vec4(1.0, 1.0, 0.0, 1.0);
-    }else{
-        FragColor = vec4(0.0, 0.0, 0.0, 0.0);
+    }else {
+        ivec2 textureSize = textureSize(texture1, 0);
+        FragColor = texture(texture1, remainder(TexCoord, textureSize));
     }
 }
 
@@ -39,20 +38,18 @@ bool modulo(float x, float y){
     return abs(x) < EPSILON;
 }
 
-bool isPosVisivel(vec2 coord){
-
-    int nQuadrados = int(1 / tamanhoQuadrado);
-
-    for(int i = 0; i < numPosVisiveis; i++){
-        vec2 pos = posVisiveis[i] / nQuadrados;
-
-        if(coord.x >= pos.x &&
-           coord.x < pos.x + tamanhoQuadrado &&
-           coord.y >= pos.y &&
-           coord.y < pos.y + tamanhoQuadrado){
-            return true;
+vec2 remainder(vec2 v1, ivec2 v2){
+    if(v2.x > 0){
+        while(v1.x >= v2.x){
+            v1.x -= v2.x;
         }
     }
 
-    return false;
+    if(v2.y > 0){
+        while(v1.y >= v2.y){
+            v1.y -= v2.y;
+        }
+    }
+
+    return v1;
 }

@@ -12,6 +12,7 @@ struct IndicesOpenGL{
     unsigned int VBO;
     unsigned int EBO;
     unsigned int numIndices;
+    unsigned int texture;
 };
 
 struct BoundingBox{
