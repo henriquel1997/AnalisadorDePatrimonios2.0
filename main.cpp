@@ -23,7 +23,6 @@ IndicesOpenGL inicializarGrid();
 IndicesOpenGL inicializarLinhas();
 void updateRaios(IndicesOpenGL* indicesGL, const float *verticesRaio = nullptr, unsigned int nRaios = 0);
 void gerarTexturaPontosVisiveis(unsigned int textureID);
-void freeIndicesOpenGL(IndicesOpenGL* indicesOpenGL);
 float float_rand( float min, float max);
 bool isPatrimonioTheClosestHit(Patrimonio* patrimonio, Ray* raio);
 void inicializarPatrimonios(Model modelo);
@@ -33,8 +32,8 @@ void inicializarBoundingBoxPatrimonios();
 Ray getCameraRay(Camera camera);
 
 // settings
-const unsigned int SCR_WIDTH = 800;
-const unsigned int SCR_HEIGHT = 600;
+const unsigned int SCR_WIDTH = 1600;
+const unsigned int SCR_HEIGHT = 900;
 
 // camera
 Camera camera(4.797128f, 4.923989f, 4.238231f, 0.f, 1.f, 0.f, -139.399979f, -45.899910f);
@@ -317,11 +316,11 @@ IndicesOpenGL inicializarGrid(){
     float metadeGrid = tamanhoLinhaGrid/2;
 
     float gridVertices[] = {
-            // positions          // texture coords
-            metadeGrid,  0.0f,  metadeGrid,  1.0f, 1.0f, // top right
-            metadeGrid,  0.0f, -metadeGrid,  1.0f, 0.0f, // bottom right
-            -metadeGrid,  0.0f, -metadeGrid,  0.0f, 0.0f, // bottom left
-            -metadeGrid,  0.0f,  metadeGrid,  0.0f, 1.0f  // top left
+            // positions                       // texture coords
+             metadeGrid,  0.0f,  metadeGrid,   1.0f, 1.0f, // top right
+             metadeGrid,  0.0f, -metadeGrid,   1.0f, 0.0f, // bottom right
+            -metadeGrid,  0.0f, -metadeGrid,   0.0f, 0.0f, // bottom left
+            -metadeGrid,  0.0f,  metadeGrid,   0.0f, 1.0f  // top left
     };
 
     float mult = 5.f;
@@ -711,6 +710,9 @@ void processInput(GLFWwindow *window){
 
     if(glfwGetKey(window, GLFW_KEY_B) == GLFW_PRESS)
         mostrarBoundingBox = !mostrarBoundingBox;
+
+    if(glfwGetKey(window, GLFW_KEY_R) == GLFW_PRESS)
+        mostrarRaios = !mostrarRaios;
 
     if(glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS){
         selecionarPatrimonio();
