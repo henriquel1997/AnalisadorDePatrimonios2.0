@@ -13,9 +13,9 @@ bool modulo(float x, float y);
 
 void main()
 {
-    if(modulo(TexCoord.x, tamanhoQuadrado) || modulo(TexCoord.y, tamanhoQuadrado)){
+    if(modulo(TexCoord.x, 0) || modulo(TexCoord.y, 0) || modulo(TexCoord.x, 1) || modulo(TexCoord.y, 1)){
         FragColor = vec4(1.0, 0.0, 0.0, 1.0);
-    }else {
+    }else{
         FragColor = texture(texture1, TexCoord);
     }
 }

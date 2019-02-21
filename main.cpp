@@ -293,26 +293,30 @@ void gerarTexturaPontosVisiveis(unsigned int textureID){
         unsigned char a;
     };
 
-
-    Color data[numeroQuadradosLinha][numeroQuadradosLinha];
-    for(unsigned int i = 0; i < numeroQuadradosLinha; i++)
-        for(unsigned int j = 0; j < numeroQuadradosLinha; j++)
-            data[i][j] = (Color){ 0, 0, 0, 255};
+    unsigned int tamanhoQuadrado = 10;
+    auto tamanhoLinha = numeroQuadradosLinha * tamanhoQuadrado;
+    Color data[tamanhoLinha][tamanhoLinha];
+    for(unsigned int i = 0; i < tamanhoLinha; i++)
+        for(unsigned int j = 0; j < tamanhoLinha; j++)
+            data[i][j] = (Color){ 0, 0, 0, 0};
 
 
     for(unsigned int i = 0; i < numPontosVisiveisChao; i++){
         Vertice2D ponto = pontosVisiveisChao[i];
         auto x = (unsigned int)ponto.x;
         auto y = (unsigned int)ponto.y;
-        data[y][x] = (Color){ 255, 255, 0, 255};
+
+        for(unsigned int j = 0; j < tamanhoQuadrado; j++)
+            for(unsigned int k = 0; k < tamanhoQuadrado; k++)
+                data[y*tamanhoQuadrado + j][x*tamanhoQuadrado + k] = (Color){ 255, 255, 0, 255};
     }
 
     glBindTexture(GL_TEXTURE_2D, textureID);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, numeroQuadradosLinha, numeroQuadradosLinha, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, tamanhoLinha, tamanhoLinha, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
 }
 
 IndicesOpenGL inicializarGrid(){
-    tamanhoLinhaGrid = 1.f;
+    tamanhoLinhaGrid = 5.f;
     float metadeGrid = tamanhoLinhaGrid/2;
 
     float gridVertices[] = {
@@ -322,11 +326,6 @@ IndicesOpenGL inicializarGrid(){
             -metadeGrid,  0.0f, -metadeGrid,   0.0f, 0.0f, // bottom left
             -metadeGrid,  0.0f,  metadeGrid,   0.0f, 1.0f  // top left
     };
-
-    float mult = 5.f;
-    tamanhoLinhaGrid *= mult;
-    for(int i = 0; i < 5*5; i++)
-        gridVertices[i] *= 5.f;
 
     unsigned int gridIndices[] = {
             0, 1, 3, // first triangle
@@ -360,8 +359,8 @@ IndicesOpenGL inicializarGrid(){
     glGenerateMipmap(GL_TEXTURE_2D);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
     IndicesOpenGL indice = {};
     indice.numIndices = 6;
