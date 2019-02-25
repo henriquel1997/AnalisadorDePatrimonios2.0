@@ -1,11 +1,13 @@
 #include <cstdio>
 #include <cmath>
+#include <time.h>
 
 #include "model_loading.h"
 #include "shader.h"
 #include "camera.h"
 #include "lista.h"
 #include "structs.h"
+#include "arvores.h"
 
 #include "glad.h"
 #include "GLFW/glfw3.h"
@@ -19,6 +21,11 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void mouse_callback(GLFWwindow* window, double xpos, double ypos);
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 void processInput(GLFWwindow *window);
+void inicializarArvore();
+void inicializarKDTree();
+void inicializarOctree();
+void unloadArvore();
+BoundingBox boundingBoxGrid();
 IndicesOpenGL inicializarGrid();
 IndicesOpenGL inicializarLinhas();
 void updateRaios(IndicesOpenGL* indicesGL, const float *verticesRaio = nullptr, unsigned int nRaios = 0);
@@ -47,6 +54,14 @@ float lastFrame = 0.0f;
 
 vec3 posPessoa(0.f, .1f, 0.f);
 
+enum TipoArvore {
+    OCTREE, KDTREE, KDTREE_TRI, NENHUMA
+};
+
+TipoArvore tipoArvore = KDTREE;
+Octree* octree = nullptr;
+KDTree* kdtree = nullptr;
+
 //Algoritmo de Visibilidade
 unsigned int patrimonioIndex = 0;
 float tamanhoLinhaGrid = -1.f;
@@ -59,6 +74,7 @@ bool avancarAlgoritmo = false; //Passo a passo
 bool animado = true;
 bool mostrarRaios = true;
 bool mostrarBoundingBox = true;
+time_t tempoInicio;
 
 Lista<Patrimonio> patrimonios;
 unsigned int numPontosVisiveisChao = 0;
@@ -116,17 +132,19 @@ int main(){
     Shader linhasShader(R"(../shader/lineshader.vs)", R"(../shader/lineshader.fs)");
     Shader bBoxShader(R"(../shader/bboxshader.vs)", R"(../shader/bboxshader.fs)");
 
+    //Grid
+    auto gridIndices = inicializarGrid();
+
+    //Linhas
+    auto linhasIndices = inicializarLinhas();
+
     //Carregando o modelo e inicializando os Patrimônios
     //Model modelo = loadModel(R"(../model/CentroFortaleza.fbx)");
     Model modelo = loadModel(R"(../model/centro.obj)");
     inicializarPatrimonios(modelo);
     inicializarBoundingBoxPatrimonios();
 
-    //Grid
-    auto gridIndices = inicializarGrid();
-
-    //Linhas
-    auto linhasIndices = inicializarLinhas();
+    inicializarArvore();
 
     // render loop
     // -----------
@@ -228,11 +246,82 @@ int main(){
     //freeLista(&patrimonios);
     free(pontosVisiveisChao);
     free(pontosPatrimonio);
+    unloadArvore();
 
     // glfw: terminate, clearing all previously allocated GLFW resources.
     // ------------------------------------------------------------------
     glfwTerminate();
     return 0;
+}
+
+void inicializarArvore(){
+    switch (tipoArvore){
+        case OCTREE:
+            inicializarOctree();
+            break;
+        case KDTREE:
+        case KDTREE_TRI:
+            inicializarKDTree();
+            break;
+
+        case NENHUMA:
+            break;
+    }
+}
+
+void inicializarKDTree(){
+    if(kdtree != nullptr){
+        UnloadKDTree(kdtree);
+        kdtree = nullptr;
+        printf("KDTree desalocada\n");
+    }
+    //printf("Comecando a construir a KDTree\n");
+    //time_t tempoInicio = time(nullptr);
+    if(tipoArvore == KDTREE){
+        kdtree = BuildKDTree(boundingBoxGrid(), patrimonios.array, patrimonios.size);
+    }else{
+        kdtree = BuildKDTreeTriangulos(boundingBoxGrid(), patrimonios.array, patrimonios.size);
+    }
+    //printf("Tempo para gerar a KDTree: %f(s)\n", difftime(time(nullptr), tempoInicio));
+}
+
+void inicializarOctree(){
+    if(octree != nullptr){
+        UnloadOctree(octree);
+        kdtree = nullptr;
+        printf("Octree desalocada\n");
+    }
+
+    //printf("Comecando a construir a Octree\n");
+    //time_t tempoInicio = time(nullptr);
+    octree = BuildOctree(boundingBoxGrid(), patrimonios.array, patrimonios.size);
+    //printf("Tempo para gerar a Octree: %f(s)\n", difftime(time(nullptr), tempoInicio));
+}
+
+void unloadArvore(){
+    switch (tipoArvore){
+        case OCTREE:
+            UnloadOctree(octree);
+            octree = nullptr;
+            printf("Octree desalocada\n");
+            break;
+        case KDTREE:
+        case KDTREE_TRI:
+            UnloadKDTree(kdtree);
+            kdtree = nullptr;
+            printf("KDTree desalocada\n");
+            break;
+
+        case NENHUMA:
+            break;
+    }
+}
+
+BoundingBox boundingBoxGrid(){
+    float metade = tamanhoLinhaGrid/2;
+    vec3 min = {-metade, -metade, -metade};
+    vec3 max = {metade, metade, metade};
+    return (BoundingBox){min, max};
 }
 
 void inicializarPatrimonios(Model modelo){
@@ -543,6 +632,10 @@ void inicializarBoundingBoxPatrimonios() {
 void algoritmoVisibilidade(IndicesOpenGL* indicesLinhas){
     if(patrimonioIndex >= 0 && tamanhoLinhaGrid > 0 && nPontosPatrimonio > 0 && pontosPatrimonio != nullptr) {
 
+        if(passoAlgoritmo == 0){
+            tempoInicio = time(nullptr);
+        }
+
         float tamanhoQuadrado = tamanhoLinhaGrid/numeroQuadradosLinha;
         float metadeGrid = tamanhoLinhaGrid/2.f;
         float metadeQuadrado = tamanhoQuadrado/2.f;
@@ -638,6 +731,8 @@ void algoritmoVisibilidade(IndicesOpenGL* indicesLinhas){
 
             if(i == numeroQuadradosTotal - 1){
 
+                auto tempoFim = time(nullptr);
+
                 executaAlgoritmo = false;
 
                 printf("Pontos Visiveis:\n");
@@ -645,6 +740,8 @@ void algoritmoVisibilidade(IndicesOpenGL* indicesLinhas){
                     Vertice2D ponto = pontosVisiveisChao[j];
                     printf("%f, %f\n", ponto.x, ponto.y);
                 }
+
+                printf("Tempo algoritmo: %f(s)\n", difftime(tempoFim, tempoInicio));
             }
 
             if(animado || avancarAlgoritmo){
@@ -757,19 +854,30 @@ float float_rand( float min, float max ){
 }
 
 bool isPatrimonioTheClosestHit(Patrimonio* patrimonio, Ray* raio){
-    unsigned int closestId = 0;
-    float closestDistance = 3.40282347E+38f;
-    for(unsigned int i = 0; i < patrimonios.size; i++){
-        //TODO: Checar a interseção com a bounding box
-        auto p = patrimonios.array[i];
-        if(intersect(raio, &p.bBox)){
-            auto hitInfo = RayHitMesh(raio, &p.mesh);
-            if(hitInfo.hit && hitInfo.distance < closestDistance){
-                closestId = p.id;
-                closestDistance = hitInfo.distance;
+
+    switch(tipoArvore){
+        case OCTREE:
+            return isPatrimonioTheClosestHit(patrimonio, raio, octree);
+
+        case KDTREE:
+        case KDTREE_TRI:
+            return isPatrimonioTheClosestHit(patrimonio, raio, kdtree);
+
+        default:
+            unsigned int closestId = 0;
+            float closestDistance = 3.40282347E+38f;
+            for(unsigned int i = 0; i < patrimonios.size; i++){
+                auto p = patrimonios.array[i];
+                if(checkCollisionRayBox(raio, &p.bBox)){
+                    auto hitInfo = RayHitMesh(raio, &p.mesh);
+                    if(hitInfo.hit && hitInfo.distance < closestDistance){
+                        closestId = p.id;
+                        closestDistance = hitInfo.distance;
+                    }
+                }
             }
-        }
+
+            return closestDistance < 3.40282347E+38f && closestId == patrimonio->id;
     }
 
-    return closestDistance < 3.40282347E+38f && closestId == patrimonio->id;
 }

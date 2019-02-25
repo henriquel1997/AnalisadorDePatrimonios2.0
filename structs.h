@@ -2,6 +2,9 @@
 // Created by Henrique on 19/02/2019.
 //
 
+#ifndef STRUCTS
+#define STRUCTS
+
 #include <glm/glm.hpp>
 #include "model_loading.h"
 
@@ -49,7 +52,18 @@ struct Vertice2D {
     float y;
 };
 
+struct Triangulo{
+    vec3 v1;
+    vec3 v2;
+    vec3 v3;
+    Patrimonio* patrimonio;
+};
+
 RayHitInfo RayHitMesh (Ray* raio, Mesh* mesh);
-bool intersect(Ray* raio, BoundingBox* box);
+bool checkCollisionRayBox(Ray *raio, BoundingBox *box);
 void desenharLinhaUnica(vec3 inicio, vec3 fim);
 void freeIndicesOpenGL(IndicesOpenGL* indicesOpenGL);
+bool checkCollisionRayBox(Ray *raio, BoundingBox *box);
+RayHitInfo RayHitTriangle(Ray* raio, Triangulo* triangulo);
+
+#endif

@@ -5,6 +5,69 @@
 #include "structs.h"
 
 //Baseado em: https://en.wikipedia.org/wiki/M%C3%B6ller%E2%80%93Trumbore_intersection_algorithm
+RayHitInfo RayHitTriangle(Ray* raio, Triangulo* triangulo){
+    const float EPSILON = 0.0000001;
+    vec3 edge1, edge2, p, q, tv;
+    float det, invDet, u, v, t;
+
+    RayHitInfo hitInfo = {};
+    hitInfo.hit = false;
+    hitInfo.point = vec3();
+    hitInfo.distance = 3.40282347E+38f;
+
+
+    vec3 vertex0 = triangulo->v1;
+    vec3 vertex1 = triangulo->v2;
+    vec3 vertex2 = triangulo->v3;
+
+    edge1 = vertex1 - vertex0;
+    edge2 = vertex2 - vertex0;
+
+    // Begin calculating determinant - also used to calculate u parameter
+    p = cross(raio->direction, edge2);
+
+    // If determinant is near zero, ray lies in plane of triangle or ray is parallel to plane of triangle
+    det = dot(edge1, p);
+
+    // Avoid culling!
+    if ((det > -EPSILON) && (det < EPSILON))
+        return hitInfo;
+
+    invDet = 1.0f/det;
+
+    //Calculate distance from V0 to ray origin
+    tv = raio->position - vertex0;
+
+    //Calculate u parameter and test bound
+    u = dot(tv, p)*invDet;
+
+    // The intersection lies outside of the triangle
+    if ((u < 0.0f) || (u > 1.0f))
+        return hitInfo;
+
+    // Prepare to test v parameter
+    q = cross(tv, edge1);
+
+    // Calculate V parameter and test bound
+    v = dot(raio->direction, q)*invDet;
+
+    // The intersection lies outside of the triangle
+    if ((v < 0.0f) || ((u + v) > 1.0f)) return hitInfo;
+
+    t = dot(edge2, q)*invDet;
+
+    if (t > EPSILON){
+        // Ray hit, get hit point and normal
+        hitInfo.hit = true;
+        hitInfo.distance = t;
+        //Normal: Vector3Normalize(Vector3CrossProduct(edge1, edge2));
+        hitInfo.point = raio->position + (raio->direction * t);
+    }
+
+    return hitInfo;
+}
+
+
 RayHitInfo RayHitMesh (Ray* raio, Mesh* mesh){
 
     const float EPSILON = 0.0000001;
@@ -70,7 +133,7 @@ RayHitInfo RayHitMesh (Ray* raio, Mesh* mesh){
 }
 
 //Baseado em: https://www.scratchapixel.com/lessons/3d-basic-rendering/minimal-ray-tracer-rendering-simple-shapes/ray-box-intersection
-bool intersect(Ray* raio, BoundingBox* box){
+bool checkCollisionRayBox(Ray *raio, BoundingBox *box){
     float tmin = (box->min.x - raio->position.x) / raio->direction.x;
     float tmax = (box->max.x - raio->position.x) / raio->direction.x;
 
