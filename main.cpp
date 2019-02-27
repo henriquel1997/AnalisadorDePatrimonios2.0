@@ -37,6 +37,8 @@ Patrimonio* getPatrimonio(unsigned int index);
 void algoritmoVisibilidade(IndicesOpenGL* indicesLinhas);
 void inicializarBoundingBoxPatrimonios();
 Ray getCameraRay(Camera camera);
+int indexPatrimonioMaisProximo(Ray raio);
+bool estaDentroDeUmPatrimonio();
 
 // settings
 const unsigned int SCR_WIDTH = 1600;
@@ -629,6 +631,24 @@ void inicializarBoundingBoxPatrimonios() {
     }
 }
 
+int indexPatrimonioMaisProximo(Ray raio){
+    switch (tipoArvore){
+        case OCTREE:
+            return indexPatrimonioMaisProximo(raio, octree);
+
+        case KDTREE:
+        case KDTREE_TRI:
+            return indexPatrimonioMaisProximo(raio, kdtree);
+        default:
+            //TODO: Implementar pra caso nao ter nenhuma arvore inicializada
+            return -1;
+    }
+}
+
+bool estaDentroDeUmPatrimonio(){
+    return indexPatrimonioMaisProximo((Ray){ posPessoa, vec3(0.f, -1.f, 0.f) }) > 0;
+}
+
 void algoritmoVisibilidade(IndicesOpenGL* indicesLinhas){
     if(patrimonioIndex >= 0 && tamanhoLinhaGrid > 0 && nPontosPatrimonio > 0 && pontosPatrimonio != nullptr) {
 
@@ -658,11 +678,10 @@ void algoritmoVisibilidade(IndicesOpenGL* indicesLinhas){
             posPessoa.x = quadradoX*tamanhoQuadrado - metadeGrid + metadeQuadrado;
             posPessoa.z = quadradoY*tamanhoQuadrado - metadeGrid + metadeQuadrado;
 
-            //TODO: Checar se está dentro de um patrimônio
-//            if(estaDentroDeUmPatrimonio()){
-//                passoAlgoritmo++;
-//                continue;
-//            }
+            if(estaDentroDeUmPatrimonio()){
+                passoAlgoritmo++;
+                continue;
+            }
 
             //Calculando a visibilidade
             unsigned int numRaios = 0;
