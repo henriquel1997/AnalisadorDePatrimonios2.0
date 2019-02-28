@@ -70,10 +70,10 @@ float tamanhoLinhaGrid = -1.f;
 unsigned int numeroQuadradosLinha = 50;
 unsigned int passoAlgoritmo = 0;
 float fov = 15.f;
-unsigned int raiosPorPonto = 100;
+unsigned int raiosPorPonto = 500;
 bool executaAlgoritmo = false;
 bool avancarAlgoritmo = false; //Passo a passo
-bool animado = true;
+bool animado = false;
 bool mostrarRaios = true;
 bool mostrarBoundingBox = true;
 time_t tempoInicio;
@@ -254,6 +254,128 @@ int main(){
     // ------------------------------------------------------------------
     glfwTerminate();
     return 0;
+}
+
+void algoritmoVisibilidade(IndicesOpenGL* indicesLinhas){
+    if(patrimonioIndex >= 0 && tamanhoLinhaGrid > 0 && nPontosPatrimonio > 0 && pontosPatrimonio != nullptr) {
+
+        if(passoAlgoritmo == 0){
+            tempoInicio = time(nullptr);
+        }
+
+        float tamanhoQuadrado = tamanhoLinhaGrid/numeroQuadradosLinha;
+        float metadeGrid = tamanhoLinhaGrid/2.f;
+        float metadeQuadrado = tamanhoQuadrado/2.f;
+        int numeroQuadradosTotal = numeroQuadradosLinha*numeroQuadradosLinha;
+        Patrimonio* patrimonio = getPatrimonio(patrimonioIndex);
+
+        if(passoAlgoritmo == 0){
+            numPontosVisiveisChao = 0;
+            if(pontosVisiveisChao != nullptr){
+                free(pontosVisiveisChao);
+            }
+            pontosVisiveisChao = (Vertice2D*) malloc(sizeof(Vertice2D) * numeroQuadradosTotal);
+        }
+
+        for (int i = passoAlgoritmo; i < numeroQuadradosTotal; i++) {
+
+            //Definindo a posição da pessoa na grid
+            int quadradoX = i/numeroQuadradosLinha;
+            int quadradoY = i%numeroQuadradosLinha;
+            posPessoa.x = quadradoX*tamanhoQuadrado - metadeGrid + metadeQuadrado;
+            posPessoa.z = quadradoY*tamanhoQuadrado - metadeGrid + metadeQuadrado;
+
+            if(estaDentroDeUmPatrimonio()){
+                passoAlgoritmo++;
+                continue;
+            }
+
+            //Calculando a visibilidade
+            unsigned int numRaios = 0;
+            Vertice raios[raiosPorPonto * nPontosPatrimonio];
+            for(unsigned int j = 0; j < nPontosPatrimonio; j++){
+                vec3 ponto(pontosPatrimonio[j].x, pontosPatrimonio[j].y, pontosPatrimonio[j].z);
+                vec3 up (0.0f, 1.0f, 0.0f);
+                vec3 visao = ponto - posPessoa;
+                vec3 vetorHorizontal = normalize(cross(up, visao));
+                vec3 vetorVertical = normalize(cross(visao, vetorHorizontal));
+                float fovMul = length(visao)*cos(fov/2);
+                vetorHorizontal = vetorHorizontal * fovMul;
+                vetorVertical = vetorVertical * fovMul;
+
+                unsigned int cont = 0;
+                for(unsigned int k = 0; k < raiosPorPonto; k++){
+                    vec3 vx = vetorHorizontal * float_rand(-1.f, 1.f);
+                    vec3 vy = vetorVertical * float_rand(-1.f, 1.f);
+                    vec3 pontoRaio = vx + vy + ponto;
+
+                    Ray raio = {};
+                    raio.position = posPessoa;
+                    raio.direction = pontoRaio - posPessoa;
+
+
+                    bool acertou = false;
+                    if(isPatrimonioTheClosestHit(patrimonio, &raio)){
+                        cont++;
+                        acertou = true;
+                    }
+
+                    if(mostrarRaios){
+                        raios[numRaios++] = (Vertice){pontoRaio.x, pontoRaio.y, pontoRaio.z};
+                    }
+
+                    if(acertou){
+                        break;
+                    }
+                }
+
+                if(cont > 0){
+                    Vertice2D novoPonto {(float)quadradoX, (float)quadradoY};
+                    bool achou = false;
+                    for(unsigned int k = 0; k < numPontosVisiveisChao; k++){
+                        Vertice2D pontoChao = pontosVisiveisChao[k];
+                        if(pontoChao.x == novoPonto.x &&
+                           pontoChao.y == novoPonto.y){
+                            achou = true;
+                            break;
+                        }
+                    }
+                    if(!achou){
+                        pontosVisiveisChao[numPontosVisiveisChao++] = novoPonto;
+                    }
+                }
+            }
+
+            if(mostrarRaios){
+                updateRaios(indicesLinhas, &raios[0].x, numRaios);
+            }else{
+                updateRaios(indicesLinhas);
+            }
+
+            //Incrementado o passo e verificando se é necessário continuar executando o algoritmo
+            passoAlgoritmo++;
+
+            if(i == numeroQuadradosTotal - 1){
+
+                auto tempoFim = time(nullptr);
+
+                executaAlgoritmo = false;
+
+                printf("Pontos Visiveis:\n");
+                for(unsigned int j = 0; j < numPontosVisiveisChao; j++) {
+                    Vertice2D ponto = pontosVisiveisChao[j];
+                    printf("%f, %f\n", ponto.x, ponto.y);
+                }
+
+                printf("Tempo algoritmo: %f(s)\n", difftime(tempoFim, tempoInicio));
+            }
+
+            if(animado || avancarAlgoritmo){
+                avancarAlgoritmo = false;
+                break;
+            }
+        }
+    }
 }
 
 void inicializarArvore(){
@@ -647,128 +769,6 @@ int indexPatrimonioMaisProximo(Ray raio){
 
 bool estaDentroDeUmPatrimonio(){
     return indexPatrimonioMaisProximo((Ray){ posPessoa, vec3(0.f, -1.f, 0.f) }) > 0;
-}
-
-void algoritmoVisibilidade(IndicesOpenGL* indicesLinhas){
-    if(patrimonioIndex >= 0 && tamanhoLinhaGrid > 0 && nPontosPatrimonio > 0 && pontosPatrimonio != nullptr) {
-
-        if(passoAlgoritmo == 0){
-            tempoInicio = time(nullptr);
-        }
-
-        float tamanhoQuadrado = tamanhoLinhaGrid/numeroQuadradosLinha;
-        float metadeGrid = tamanhoLinhaGrid/2.f;
-        float metadeQuadrado = tamanhoQuadrado/2.f;
-        int numeroQuadradosTotal = numeroQuadradosLinha*numeroQuadradosLinha;
-        Patrimonio* patrimonio = getPatrimonio(patrimonioIndex);
-
-        if(passoAlgoritmo == 0){
-            numPontosVisiveisChao = 0;
-            if(pontosVisiveisChao != nullptr){
-                free(pontosVisiveisChao);
-            }
-            pontosVisiveisChao = (Vertice2D*) malloc(sizeof(Vertice2D) * numeroQuadradosTotal);
-        }
-
-        for (int i = passoAlgoritmo; i < numeroQuadradosTotal; i++) {
-
-            //Definindo a posição da pessoa na grid
-            int quadradoX = i/numeroQuadradosLinha;
-            int quadradoY = i%numeroQuadradosLinha;
-            posPessoa.x = quadradoX*tamanhoQuadrado - metadeGrid + metadeQuadrado;
-            posPessoa.z = quadradoY*tamanhoQuadrado - metadeGrid + metadeQuadrado;
-
-            if(estaDentroDeUmPatrimonio()){
-                passoAlgoritmo++;
-                continue;
-            }
-
-            //Calculando a visibilidade
-            unsigned int numRaios = 0;
-            Vertice raios[raiosPorPonto * nPontosPatrimonio];
-            for(unsigned int j = 0; j < nPontosPatrimonio; j++){
-                vec3 ponto(pontosPatrimonio[j].x, pontosPatrimonio[j].y, pontosPatrimonio[j].z);
-                vec3 up (0.0f, 1.0f, 0.0f);
-                vec3 visao = ponto - posPessoa;
-                vec3 vetorHorizontal = normalize(cross(up, visao));
-                vec3 vetorVertical = normalize(cross(visao, vetorHorizontal));
-                float fovMul = length(visao)*cos(fov/2);
-                vetorHorizontal = vetorHorizontal * fovMul;
-                vetorVertical = vetorVertical * fovMul;
-
-                unsigned int cont = 0;
-                for(unsigned int k = 0; k < raiosPorPonto; k++){
-                    vec3 vx = vetorHorizontal * float_rand(-1.f, 1.f);
-                    vec3 vy = vetorVertical * float_rand(-1.f, 1.f);
-                    vec3 pontoRaio = vx + vy + ponto;
-
-                    Ray raio = {};
-                    raio.position = posPessoa;
-                    raio.direction = pontoRaio - posPessoa;
-
-
-                    bool acertou = false;
-                    if(isPatrimonioTheClosestHit(patrimonio, &raio)){
-                        cont++;
-                        acertou = true;
-                    }
-
-                    if(mostrarRaios){
-                        raios[numRaios++] = (Vertice){pontoRaio.x, pontoRaio.y, pontoRaio.z};
-                    }
-
-                    if(acertou){
-                        break;
-                    }
-                }
-
-                if(cont > 0){
-                    Vertice2D novoPonto {(float)quadradoX, (float)quadradoY};
-                    bool achou = false;
-                    for(unsigned int k = 0; k < numPontosVisiveisChao; k++){
-                        Vertice2D pontoChao = pontosVisiveisChao[k];
-                        if(pontoChao.x == novoPonto.x &&
-                           pontoChao.y == novoPonto.y){
-                            achou = true;
-                            break;
-                        }
-                    }
-                    if(!achou){
-                        pontosVisiveisChao[numPontosVisiveisChao++] = novoPonto;
-                    }
-                }
-            }
-
-            if(mostrarRaios){
-                updateRaios(indicesLinhas, &raios[0].x, numRaios);
-            }else{
-                updateRaios(indicesLinhas);
-            }
-
-            //Incrementado o passo e verificando se é necessário continuar executando o algoritmo
-            passoAlgoritmo++;
-
-            if(i == numeroQuadradosTotal - 1){
-
-                auto tempoFim = time(nullptr);
-
-                executaAlgoritmo = false;
-
-                printf("Pontos Visiveis:\n");
-                for(unsigned int j = 0; j < numPontosVisiveisChao; j++) {
-                    Vertice2D ponto = pontosVisiveisChao[j];
-                    printf("%f, %f\n", ponto.x, ponto.y);
-                }
-
-                printf("Tempo algoritmo: %f(s)\n", difftime(tempoFim, tempoInicio));
-            }
-
-            if(animado || avancarAlgoritmo){
-                avancarAlgoritmo = false;
-                break;
-            }
-        }
-    }
 }
 
 Ray getCameraRay(Camera camera){
