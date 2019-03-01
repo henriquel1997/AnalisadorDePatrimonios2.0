@@ -320,7 +320,7 @@ void algoritmoVisibilidade(IndicesOpenGL* indicesLinhas){
                         acertou = true;
                     }
 
-                    if(mostrarRaios){
+                    if(animado && mostrarRaios){
                         raios[numRaios++] = (Vertice){pontoRaio.x, pontoRaio.y, pontoRaio.z};
                     }
 
