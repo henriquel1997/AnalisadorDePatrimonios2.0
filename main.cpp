@@ -71,7 +71,7 @@ unsigned int numeroQuadradosLinha = 50;
 unsigned int passoAlgoritmo = 0;
 float fov = 15.f;
 float tamanhoRaio = 3.0f;
-unsigned int raiosPorPonto = 200;
+unsigned int raiosPorPonto = 1000;
 bool executaAlgoritmo = false;
 bool avancarSolto = false;
 bool avancarAlgoritmo = false; //Passo a passo
@@ -213,12 +213,14 @@ int main(){
         DrawModel(&modelo, lightingShader.ID);
 
         //Desenha as linhas
-        linhasShader.use();
-        linhasShader.setMat4("projection", projection);
-        linhasShader.setMat4("view", view);
-        linhasShader.setMat4("model", model);
-        glBindVertexArray(linhasIndices.VAO);
-        glDrawElements(GL_LINES, linhasIndices.numIndices, GL_UNSIGNED_INT, 0);
+        if(executaAlgoritmo && mostrarRaios){
+            linhasShader.use();
+            linhasShader.setMat4("projection", projection);
+            linhasShader.setMat4("view", view);
+            linhasShader.setMat4("model", model);
+            glBindVertexArray(linhasIndices.VAO);
+            glDrawElements(GL_LINES, linhasIndices.numIndices, GL_UNSIGNED_INT, 0);
+        }
 
         if(mostrarBoundingBox){
             bBoxShader.use();
@@ -232,6 +234,20 @@ int main(){
                 glDrawElements(GL_LINES, p.indices.numIndices, GL_UNSIGNED_INT, 0);
             }
         }
+
+        //**HUD**//
+
+        // Create an orthograpic matrix for WIDTH and HEIGHT of your screen's drawing area
+//        auto ortho = glm::ortho(0.0f, (float)SCR_WIDTH, (float)SCR_HEIGHT, 0.0f);
+//
+//        glDisable(GL_DEPTH_TEST); // Disable the Depth-testing
+//
+//        glm::mat4 _guiMVP;
+//        auto guiMatrix = ortho * glm::mat4(1.0f); // Identity Matrix
+//
+//        //Desenhar aqui
+//
+//        glEnable(GL_DEPTH_TEST); // Enable the Depth-testing
 
         // glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
         // -------------------------------------------------------------------------------
@@ -486,7 +502,7 @@ void inicializarPatrimonios(Model modelo){
 Patrimonio* getPatrimonio(unsigned int index){
     //TODO: Deixar genérico para caso o patrimônio seja removido
     Patrimonio* p = nullptr;
-    if(index < patrimonios.size){
+    if(index <= patrimonios.size){
         p = &patrimonios.array[index-1];
     }
     return p;
@@ -602,6 +618,12 @@ IndicesOpenGL inicializarLinhas(){
 void updateRaios(IndicesOpenGL* indicesGL,
                  const float *verticesRaio,
                  unsigned int nRaios){
+
+    //Checagem para evitar desenhar os raios quando o número
+    //for muito grande, caso isso acontecesse o programa travaria.
+    if(nRaios >= 10000){
+        nRaios = 0;
+    }
 
     int tamanhoVertices = 3*(nRaios+ 2);
     float vertices[tamanhoVertices];

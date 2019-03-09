@@ -35,7 +35,10 @@ bool boxContainsBox(BoundingBox fora, BoundingBox dentro){
 Octree* BuildOctree(BoundingBox regiao, Patrimonio* patrimonios, unsigned int nPatrimonios){
     std::vector<Patrimonio> vetor;
     for(unsigned int i = 0; i < nPatrimonios; i++){
-        vetor.push_back(patrimonios[i]);
+        auto patrimonio = patrimonios[i];
+        if(boxContainsBox(regiao, patrimonio.bBox)){
+            vetor.push_back(patrimonios[i]);
+        }
     }
     return BuildOctree(regiao, vetor);
 }
@@ -195,7 +198,10 @@ IndexDistance indexDistanceMaisProximo(IndexDistance indexDistance, Ray ray, Oct
 KDTree* BuildKDTree(BoundingBox regiao, Patrimonio* patrimonios, unsigned int nPatrimonios){
     std::vector<Patrimonio> vetor;
     for(unsigned int i = 0; i < nPatrimonios; i++){
-        vetor.push_back(patrimonios[i]);
+        auto patrimonio = patrimonios[i];
+        if(boxContainsBox(regiao, patrimonio.bBox)){
+            vetor.push_back(patrimonios[i]);
+        }
     }
     return BuildKDTree(regiao, vetor);
 }
@@ -491,6 +497,7 @@ void UnloadKDTree(KDTree* kdtree){
 }
 
 bool isPatrimonioTheClosestHit(Patrimonio* patrimonio, Ray* ray, KDTree* kdtree){
+
     if(kdtree != nullptr && checkCollisionRayBox(ray, &patrimonio->bBox)) {
 
         RayHitInfo patrimonioHitInfo = RayHitMesh(ray, &patrimonio->mesh);
