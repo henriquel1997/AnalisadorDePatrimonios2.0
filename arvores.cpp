@@ -127,7 +127,7 @@ bool isPatrimonioTheClosestHit(Patrimonio* patrimonio, Ray* ray, Octree *octree)
 
         RayHitInfo patrimonioHitInfo = RayHitMesh(ray, &patrimonio->mesh);
 
-        if(patrimonioHitInfo.hit){
+        if(patrimonioHitInfo.hit && patrimonioHitInfo.distance <= ray->length){
             return !existeUmPatrimonioMaisProximo(patrimonio->id, patrimonioHitInfo.distance, *ray, octree);
         }
     }
@@ -494,7 +494,7 @@ bool isPatrimonioTheClosestHit(Patrimonio* patrimonio, Ray* ray, KDTree* kdtree)
     if(kdtree != nullptr && checkCollisionRayBox(ray, &patrimonio->bBox)) {
 
         RayHitInfo patrimonioHitInfo = RayHitMesh(ray, &patrimonio->mesh);
-        if (patrimonioHitInfo.hit) {
+        if (patrimonioHitInfo.hit && patrimonioHitInfo.distance <= ray->length) {
             return !existeUmPatrimonioMaisProximo(patrimonio->id, patrimonioHitInfo.distance, *ray, kdtree);
         }
     }

@@ -66,14 +66,16 @@ KDTree* kdtree = nullptr;
 
 //Algoritmo de Visibilidade
 unsigned int patrimonioIndex = 0;
-float tamanhoLinhaGrid = -1.f;
+float tamanhoLinhaGrid = 5.f;
 unsigned int numeroQuadradosLinha = 50;
 unsigned int passoAlgoritmo = 0;
 float fov = 15.f;
-unsigned int raiosPorPonto = 500;
+float tamanhoRaio = 3.0f;
+unsigned int raiosPorPonto = 200;
 bool executaAlgoritmo = false;
+bool avancarSolto = false;
 bool avancarAlgoritmo = false; //Passo a passo
-bool animado = false;
+bool animado = true;
 bool mostrarRaios = true;
 bool mostrarBoundingBox = true;
 time_t tempoInicio;
@@ -296,20 +298,21 @@ void algoritmoVisibilidade(IndicesOpenGL* indicesLinhas){
             for(unsigned int j = 0; j < nPontosPatrimonio; j++){
                 vec3 ponto(pontosPatrimonio[j].x, pontosPatrimonio[j].y, pontosPatrimonio[j].z);
                 vec3 up (0.0f, 1.0f, 0.0f);
-                vec3 visao = ponto - posPessoa;
+                vec3 visao = normalize(ponto - posPessoa) * tamanhoRaio;
                 vec3 vetorHorizontal = normalize(cross(up, visao));
                 vec3 vetorVertical = normalize(cross(visao, vetorHorizontal));
                 float fovMul = length(visao)*cos(fov/2);
-                vetorHorizontal = vetorHorizontal * fovMul;
-                vetorVertical = vetorVertical * fovMul;
+                vetorHorizontal *= fovMul;
+                vetorVertical *= fovMul;
 
                 unsigned int cont = 0;
                 for(unsigned int k = 0; k < raiosPorPonto; k++){
                     vec3 vx = vetorHorizontal * float_rand(-1.f, 1.f);
                     vec3 vy = vetorVertical * float_rand(-1.f, 1.f);
-                    vec3 pontoRaio = vx + vy + ponto;
+                    vec3 pontoRaio = vx + vy + visao + posPessoa;
 
                     Ray raio = {};
+                    raio.length = tamanhoRaio;
                     raio.position = posPessoa;
                     raio.direction = pontoRaio - posPessoa;
 
@@ -356,17 +359,8 @@ void algoritmoVisibilidade(IndicesOpenGL* indicesLinhas){
             passoAlgoritmo++;
 
             if(i == numeroQuadradosTotal - 1){
-
                 auto tempoFim = time(nullptr);
-
                 executaAlgoritmo = false;
-
-                printf("Pontos Visiveis:\n");
-                for(unsigned int j = 0; j < numPontosVisiveisChao; j++) {
-                    Vertice2D ponto = pontosVisiveisChao[j];
-                    printf("%f, %f\n", ponto.x, ponto.y);
-                }
-
                 printf("Tempo algoritmo: %f(s)\n", difftime(tempoFim, tempoInicio));
             }
 
@@ -529,7 +523,6 @@ void gerarTexturaPontosVisiveis(unsigned int textureID){
 }
 
 IndicesOpenGL inicializarGrid(){
-    tamanhoLinhaGrid = 5.f;
     float metadeGrid = tamanhoLinhaGrid/2;
 
     float gridVertices[] = {
@@ -768,7 +761,7 @@ int indexPatrimonioMaisProximo(Ray raio){
 }
 
 bool estaDentroDeUmPatrimonio(){
-    return indexPatrimonioMaisProximo((Ray){ posPessoa, vec3(0.f, -1.f, 0.f) }) > 0;
+    return indexPatrimonioMaisProximo((Ray){ posPessoa, vec3(0.f, -1.f, 0.f), tamanhoRaio }) > 0;
 }
 
 Ray getCameraRay(Camera camera){
@@ -809,6 +802,16 @@ void processInput(GLFWwindow *window){
     if (glfwGetKey(window, GLFW_KEY_ENTER) == GLFW_PRESS){
         executaAlgoritmo = true;
         passoAlgoritmo = 0;
+    }
+
+    if(glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_RELEASE){
+        avancarSolto = true;
+    }
+
+    if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS && avancarSolto){
+        executaAlgoritmo = true;
+        avancarAlgoritmo = true;
+        avancarSolto = false;
     }
 
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
@@ -884,19 +887,19 @@ bool isPatrimonioTheClosestHit(Patrimonio* patrimonio, Ray* raio){
 
         default:
             unsigned int closestId = 0;
-            float closestDistance = 3.40282347E+38f;
+            float closestDistance = raio->length;
             for(unsigned int i = 0; i < patrimonios.size; i++){
                 auto p = patrimonios.array[i];
                 if(checkCollisionRayBox(raio, &p.bBox)){
                     auto hitInfo = RayHitMesh(raio, &p.mesh);
-                    if(hitInfo.hit && hitInfo.distance < closestDistance){
+                    if(hitInfo.hit && hitInfo.distance <= closestDistance){
                         closestId = p.id;
                         closestDistance = hitInfo.distance;
                     }
                 }
             }
 
-            return closestDistance < 3.40282347E+38f && closestId == patrimonio->id;
+            return closestId == patrimonio->id;
     }
 
 }

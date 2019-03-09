@@ -33,6 +33,7 @@ struct Patrimonio {
 struct Ray {
     vec3 position;
     vec3 direction;
+    float length;
 };
 
 struct RayHitInfo {

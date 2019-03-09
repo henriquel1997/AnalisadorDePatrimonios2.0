@@ -15,7 +15,6 @@ RayHitInfo RayHitTriangle(Ray* raio, Triangulo* triangulo){
     hitInfo.point = vec3();
     hitInfo.distance = 3.40282347E+38f;
 
-
     vec3 vertex0 = triangulo->v1;
     vec3 vertex1 = triangulo->v2;
     vec3 vertex2 = triangulo->v3;
@@ -59,9 +58,9 @@ RayHitInfo RayHitTriangle(Ray* raio, Triangulo* triangulo){
     if (t > EPSILON){
         // Ray hit, get hit point and normal
         hitInfo.hit = true;
-        hitInfo.distance = t;
         //Normal: Vector3Normalize(Vector3CrossProduct(edge1, edge2));
         hitInfo.point = raio->position + (raio->direction * t);
+        hitInfo.distance = length(hitInfo.point - raio->position);
     }
 
     return hitInfo;
@@ -84,48 +83,10 @@ RayHitInfo RayHitMesh (Ray* raio, Mesh* mesh){
         vec3 vertex1 = mesh->vertices[mesh->indices[i + 1]].Position;
         vec3 vertex2 = mesh->vertices[mesh->indices[i + 2]].Position;
 
-        edge1 = vertex1 - vertex0;
-        edge2 = vertex2 - vertex0;
-
-        // Begin calculating determinant - also used to calculate u parameter
-        p = cross(raio->direction, edge2);
-
-        // If determinant is near zero, ray lies in plane of triangle or ray is parallel to plane of triangle
-        det = dot(edge1, p);
-
-        // Avoid culling!
-        if ((det > -EPSILON) && (det < EPSILON))
-            continue;
-
-        invDet = 1.0f/det;
-
-        //Calculate distance from V0 to ray origin
-        tv = raio->position - vertex0;
-
-        //Calculate u parameter and test bound
-        u = dot(tv, p)*invDet;
-
-        // The intersection lies outside of the triangle
-        if ((u < 0.0f) || (u > 1.0f))
-            continue;
-
-        // Prepare to test v parameter
-        q = cross(tv, edge1);
-
-        // Calculate V parameter and test bound
-        v = dot(raio->direction, q)*invDet;
-
-        // The intersection lies outside of the triangle
-        if ((v < 0.0f) || ((u + v) > 1.0f)) continue;
-
-        t = dot(edge2, q)*invDet;
-
-        if (t > EPSILON && t < hitInfo.distance){
-            // Ray hit, get hit point and normal
-            hitInfo.hit = true;
-            hitInfo.distance = t;
-            //Normal: Vector3Normalize(Vector3CrossProduct(edge1, edge2));
-            hitInfo.point = raio->position + (raio->direction * t);
+        Triangulo triangulo = {vertex0, vertex1, vertex2};
+        auto newHitInfo = RayHitTriangle(raio, &triangulo);
+        if(newHitInfo.distance < hitInfo.distance){
+            hitInfo = newHitInfo;
         }
     }
 
