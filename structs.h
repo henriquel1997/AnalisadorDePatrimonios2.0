@@ -53,6 +53,12 @@ struct Vertice2D {
     float y;
 };
 
+struct PontoChao {
+    float x;
+    float y;
+    float porcentagem;
+};
+
 struct Triangulo{
     vec3 v1;
     vec3 v2;

@@ -26,7 +26,7 @@ void inicializarKDTree();
 void inicializarOctree();
 void unloadArvore();
 BoundingBox boundingBoxGrid();
-IndicesOpenGL inicializarGrid();
+IndicesOpenGL* inicializarGrid();
 IndicesOpenGL inicializarLinhas();
 void updateRaios(IndicesOpenGL* indicesGL, const float *verticesRaio = nullptr, unsigned int nRaios = 0);
 void gerarTexturaPontosVisiveis(unsigned int textureID);
@@ -72,6 +72,7 @@ unsigned int passoAlgoritmo = 0;
 float fov = 15.f;
 float tamanhoRaio = 3.0f;
 unsigned int raiosPorPonto = 1000;
+bool comPorcentagem = true;
 bool executaAlgoritmo = false;
 bool avancarSolto = false;
 bool avancarAlgoritmo = false; //Passo a passo
@@ -82,9 +83,11 @@ time_t tempoInicio;
 
 Lista<Patrimonio> patrimonios;
 unsigned int numPontosVisiveisChao = 0;
-Vertice2D* pontosVisiveisChao = nullptr;
+PontoChao* pontosVisiveisChao = nullptr;
+
 unsigned int nPontosPatrimonio = 0;
 Vertice* pontosPatrimonio = nullptr;
+IndicesOpenGL* gridIndices = nullptr;
 
 int main(){
     // glfw: initialize and configure
@@ -137,7 +140,7 @@ int main(){
     Shader bBoxShader(R"(../shader/bboxshader.vs)", R"(../shader/bboxshader.fs)");
 
     //Grid
-    auto gridIndices = inicializarGrid();
+    gridIndices = inicializarGrid();
 
     //Linhas
     auto linhasIndices = inicializarLinhas();
@@ -178,15 +181,14 @@ int main(){
 
         gridShader.use();
         glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, gridIndices.texture);
+        glBindTexture(GL_TEXTURE_2D, gridIndices->texture);
         gridShader.setMat4("projection", projection);
         gridShader.setMat4("view", view);
         gridShader.setMat4("model", model);
         gridShader.setFloat("tamanhoQuadrado", tamanhoLinhaGrid/numeroQuadradosLinha);
-        gerarTexturaPontosVisiveis(gridIndices.texture);
 
-        glBindVertexArray(gridIndices.VAO);
-        glDrawElements(GL_TRIANGLES, gridIndices.numIndices, GL_UNSIGNED_INT, 0);
+        glBindVertexArray(gridIndices->VAO);
+        glDrawElements(GL_TRIANGLES, gridIndices->numIndices, GL_UNSIGNED_INT, 0);
 
         // be sure to activate shader when setting uniforms/drawing objects
         lightingShader.use();
@@ -258,7 +260,7 @@ int main(){
     // optional: de-allocate all resources once they've outlived their purpose:
     // ------------------------------------------------------------------------
     freeModel(&modelo);
-    freeIndicesOpenGL(&gridIndices);
+    freeIndicesOpenGL(gridIndices);
     freeIndicesOpenGL(&linhasIndices);
     for(int i = 0; i < patrimonios.size; i++){
         freeIndicesOpenGL(&patrimonios.array[i].indices);
@@ -292,7 +294,7 @@ void algoritmoVisibilidade(IndicesOpenGL* indicesLinhas){
             if(pontosVisiveisChao != nullptr){
                 free(pontosVisiveisChao);
             }
-            pontosVisiveisChao = (Vertice2D*) malloc(sizeof(Vertice2D) * numeroQuadradosTotal);
+            pontosVisiveisChao = (PontoChao*) malloc(sizeof(PontoChao) * numeroQuadradosTotal);
         }
 
         for (int i = passoAlgoritmo; i < numeroQuadradosTotal; i++) {
@@ -310,6 +312,7 @@ void algoritmoVisibilidade(IndicesOpenGL* indicesLinhas){
 
             //Calculando a visibilidade
             unsigned int numRaios = 0;
+            unsigned int maiorContRaios = 0;
             Vertice raios[raiosPorPonto * nPontosPatrimonio];
             for(unsigned int j = 0; j < nPontosPatrimonio; j++){
                 vec3 ponto(pontosPatrimonio[j].x, pontosPatrimonio[j].y, pontosPatrimonio[j].z);
@@ -343,25 +346,40 @@ void algoritmoVisibilidade(IndicesOpenGL* indicesLinhas){
                         raios[numRaios++] = (Vertice){pontoRaio.x, pontoRaio.y, pontoRaio.z};
                     }
 
-                    if(acertou){
+                    if(!comPorcentagem && acertou){
                         break;
                     }
                 }
 
-                if(cont > 0){
-                    Vertice2D novoPonto {(float)quadradoX, (float)quadradoY};
-                    bool achou = false;
-                    for(unsigned int k = 0; k < numPontosVisiveisChao; k++){
-                        Vertice2D pontoChao = pontosVisiveisChao[k];
-                        if(pontoChao.x == novoPonto.x &&
-                           pontoChao.y == novoPonto.y){
-                            achou = true;
-                            break;
-                        }
+                if(!comPorcentagem && cont > 0){
+                    maiorContRaios = numRaios;
+                    break;
+                }
+
+                if(cont > maiorContRaios){
+                    maiorContRaios = cont;
+                }
+            }
+
+            if(maiorContRaios > 0){
+                float porcentagem = float(maiorContRaios)/raiosPorPonto;
+                PontoChao novoPonto {(float)quadradoX, (float)quadradoY, porcentagem};
+
+                //TODO: Verificar se precisa memso desse for, apenas necessário caso
+                //      seja possível que a pessoa passe mais de uma vez por cada ponto
+                bool achou = false;
+                for(unsigned int k = 0; k < numPontosVisiveisChao; k++){
+                    auto pontoChao = &pontosVisiveisChao[k];
+                    if(pontoChao->x == novoPonto.x &&
+                       pontoChao->y == novoPonto.y){
+                        achou = true;
+                        pontoChao->porcentagem = porcentagem;
+                        break;
                     }
-                    if(!achou){
-                        pontosVisiveisChao[numPontosVisiveisChao++] = novoPonto;
-                    }
+                }
+
+                if(!achou){
+                    pontosVisiveisChao[numPontosVisiveisChao++] = novoPonto;
                 }
             }
 
@@ -384,6 +402,10 @@ void algoritmoVisibilidade(IndicesOpenGL* indicesLinhas){
                 avancarAlgoritmo = false;
                 break;
             }
+        }
+
+        if(gridIndices != nullptr){
+            gerarTexturaPontosVisiveis(gridIndices->texture);
         }
     }
 }
@@ -517,28 +539,35 @@ void gerarTexturaPontosVisiveis(unsigned int textureID){
     };
 
     unsigned int tamanhoQuadrado = 10;
+
     auto tamanhoLinha = numeroQuadradosLinha * tamanhoQuadrado;
-    Color data[tamanhoLinha][tamanhoLinha];
+    auto* data = new Color[tamanhoLinha*tamanhoLinha];
     for(unsigned int i = 0; i < tamanhoLinha; i++)
         for(unsigned int j = 0; j < tamanhoLinha; j++)
-            data[i][j] = (Color){ 0, 0, 0, 0};
+            data[i*tamanhoLinha + j] = (Color){ 0, 0, 0, 0};
 
 
     for(unsigned int i = 0; i < numPontosVisiveisChao; i++){
-        Vertice2D ponto = pontosVisiveisChao[i];
+        PontoChao ponto = pontosVisiveisChao[i];
         auto x = (unsigned int)ponto.x;
         auto y = (unsigned int)ponto.y;
 
-        for(unsigned int j = 0; j < tamanhoQuadrado; j++)
-            for(unsigned int k = 0; k < tamanhoQuadrado; k++)
-                data[y*tamanhoQuadrado + j][x*tamanhoQuadrado + k] = (Color){ 255, 255, 0, 255};
+        for(unsigned int j = 0; j < tamanhoQuadrado; j++) {
+            for (unsigned int k = 0; k < tamanhoQuadrado; k++){
+                auto hor = y*tamanhoQuadrado + j;
+                auto ver = x*tamanhoQuadrado + k;
+                auto alpha = (unsigned char)(255*ponto.porcentagem);
+                data[hor*tamanhoLinha + ver] = (Color){ 255, 255, 0, alpha};
+            }
+        }
     }
 
     glBindTexture(GL_TEXTURE_2D, textureID);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, tamanhoLinha, tamanhoLinha, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+    free(data);
 }
 
-IndicesOpenGL inicializarGrid(){
+IndicesOpenGL* inicializarGrid(){
     float metadeGrid = tamanhoLinhaGrid/2;
 
     float gridVertices[] = {
@@ -584,12 +613,13 @@ IndicesOpenGL inicializarGrid(){
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
-    IndicesOpenGL indice = {};
-    indice.numIndices = 6;
-    indice.VAO = gridVAO;
-    indice.VBO = gridVBO;
-    indice.EBO = gridEBO;
-    indice.texture = textureID;
+
+    auto indice = (IndicesOpenGL*)malloc(sizeof(IndicesOpenGL));
+    indice->numIndices = 6;
+    indice->VAO = gridVAO;
+    indice->VBO = gridVBO;
+    indice->EBO = gridEBO;
+    indice->texture = textureID;
 
     return indice;
 }
