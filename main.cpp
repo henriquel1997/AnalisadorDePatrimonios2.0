@@ -72,7 +72,7 @@ unsigned int passoAlgoritmo = 0;
 float fov = 15.f;
 float tamanhoRaio = 3.0f;
 unsigned int raiosPorPonto = 1000;
-bool comPorcentagem = false;
+bool comPorcentagem = true;
 bool executaAlgoritmo = false;
 bool avancarSolto = false;
 bool avancarAlgoritmo = false; //Passo a passo
@@ -364,23 +364,7 @@ void algoritmoVisibilidade(IndicesOpenGL* indicesLinhas){
             if(maiorContRaios > 0){
                 float porcentagem = float(maiorContRaios)/raiosPorPonto;
                 PontoChao novoPonto {(float)quadradoX, (float)quadradoY, porcentagem};
-
-                //TODO: Verificar se precisa memso desse for, apenas necessário caso
-                //      seja possível que a pessoa passe mais de uma vez por cada ponto
-                bool achou = false;
-                for(unsigned int k = 0; k < numPontosVisiveisChao; k++){
-                    auto pontoChao = &pontosVisiveisChao[k];
-                    if(pontoChao->x == novoPonto.x &&
-                       pontoChao->y == novoPonto.y){
-                        achou = true;
-                        pontoChao->porcentagem = porcentagem;
-                        break;
-                    }
-                }
-
-                if(!achou){
-                    pontosVisiveisChao[numPontosVisiveisChao++] = novoPonto;
-                }
+                pontosVisiveisChao[numPontosVisiveisChao++] = novoPonto;
             }
 
             if(mostrarRaios){
