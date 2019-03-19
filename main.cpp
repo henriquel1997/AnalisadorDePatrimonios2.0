@@ -72,12 +72,12 @@ unsigned int passoAlgoritmo = 0;
 float fov = 15.f;
 float tamanhoRaio = 3.0f;
 unsigned int raiosPorPonto = 1000;
-bool comPorcentagem = true;
+bool comPorcentagem = false;
 bool executaAlgoritmo = false;
 bool avancarSolto = false;
 bool avancarAlgoritmo = false; //Passo a passo
 bool animado = true;
-bool mostrarRaios = true;
+bool mostrarRaios = false;
 bool mostrarBoundingBox = true;
 time_t tempoInicio;
 
@@ -352,7 +352,7 @@ void algoritmoVisibilidade(IndicesOpenGL* indicesLinhas){
                 }
 
                 if(!comPorcentagem && cont > 0){
-                    maiorContRaios = numRaios;
+                    maiorContRaios = raiosPorPonto;
                     break;
                 }
 
