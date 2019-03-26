@@ -28,6 +28,8 @@ struct Patrimonio {
     Mesh mesh;
     BoundingBox bBox;
     IndicesOpenGL indices;
+    unsigned int numRaiosAtingidos;
+    unsigned int maiorNumRaios;
 };
 
 struct Ray {

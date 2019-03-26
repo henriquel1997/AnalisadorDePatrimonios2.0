@@ -163,7 +163,7 @@ bool existeUmPatrimonioMaisProximo(int patrimonioIndex, float patrimonioDistance
     return false;
 }
 
-int indexPatrimonioMaisProximo(Ray ray, Octree *octree){
+unsigned int indexPatrimonioMaisProximo(Ray ray, Octree *octree){
 
     unsigned int indexMaisProximo = 0;
     float distanciaMaisProximo = 3.40282347E+38f;
@@ -537,7 +537,7 @@ bool existeUmPatrimonioMaisProximo(int patrimonioIndex, float patrimonioDistance
     return false;
 }
 
-int indexPatrimonioMaisProximo(Ray ray, KDTree *kdtree){
+unsigned int indexPatrimonioMaisProximo(Ray ray, KDTree *kdtree){
 
     IndexDistance indexDistance = {0, 3.40282347E+38f};
     return indexDistanceMaisProximo(indexDistance, ray, kdtree).index;

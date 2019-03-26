@@ -52,6 +52,9 @@ uniform PointLight pointLights[MAX_POINT_LIGHT_NUMBER];
 uniform Material material;
 uniform vec3 viewPos;
 
+uniform float alpha;
+uniform vec3 secondColor;
+
 in vec3 Normal;
 in vec3 FragPos;
 in vec2 TexCoords;
@@ -80,6 +83,8 @@ void main()
 
     //phase 3: Spot light
     //result += CalcSpotLightSoft(spotLight, norm, FragPos, viewDir);
+
+    result = mix(result, secondColor, alpha);
 
     FragColor = vec4(result, 1.0);
 }

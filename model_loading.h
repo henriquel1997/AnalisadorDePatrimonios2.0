@@ -12,6 +12,7 @@
 #include <glm/glm.hpp>
 
 #include "glad.h"
+#include "shader.h"
 
 struct Vertex {
     glm::vec3 Position;
@@ -47,6 +48,7 @@ struct Model{
 void setupMesh(Mesh* mesh);
 void DrawMesh(Mesh* mesh, unsigned int shaderID);
 void DrawModel(Model* model, unsigned int shaderID);
+void DrawModelAttribs(Model *model, Shader *shader, const char *nomeAtributo, float *valores);
 unsigned int TextureFromFile(const char *path, const char* directory);
 void loadMaterialTextures(Mesh* mesh, unsigned int currentIndex, aiMaterial *mat, aiTextureType type, const char* directory);
 Mesh processMesh(aiMesh *aiMesh, const aiScene *scene, const char* directory);

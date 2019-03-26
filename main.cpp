@@ -35,10 +35,12 @@ bool isPatrimonioTheClosestHit(Patrimonio* patrimonio, Ray* raio);
 void inicializarPatrimonios(Model modelo);
 Patrimonio* getPatrimonio(unsigned int index);
 void algoritmoVisibilidade(IndicesOpenGL* indicesLinhas);
+void visibilidadePredios(unsigned int patrimonioId, vec3 ponto);
 void inicializarBoundingBoxPatrimonios();
 Ray getCameraRay(Camera camera);
-int indexPatrimonioMaisProximo(Ray raio);
+unsigned int indexPatrimonioMaisProximo(Ray raio);
 bool estaDentroDeUmPatrimonio();
+void gerarAlphaPredios(float *cores);
 
 // settings
 const unsigned int SCR_WIDTH = 1600;
@@ -71,8 +73,10 @@ unsigned int numeroQuadradosLinha = 50;
 unsigned int passoAlgoritmo = 0;
 float fov = 15.f;
 float tamanhoRaio = 3.0f;
-unsigned int raiosPorPonto = 1000;
+unsigned int raiosPorPonto = 500;
 bool comPorcentagem = true;
+bool porcentagemPredios = true;
+float porcentagemMinimaParaPredios = 0.3f;
 bool executaAlgoritmo = false;
 bool avancarSolto = false;
 bool avancarAlgoritmo = false; //Passo a passo
@@ -209,10 +213,12 @@ int main(){
         lightingShader.setMat4("view", view);
 
         // render model
-        //model = scale(mat4(1.0f), vec3(0.005f));
         model = mat4(1.0f);
         lightingShader.setMat4("model", model);
-        DrawModel(&modelo, lightingShader.ID);
+        lightingShader.setVec3("secondColor", vec3(0.f, 0.f, 1.f));
+        float alpha[patrimonios.size];
+        gerarAlphaPredios(alpha);
+        DrawModelAttribs(&modelo, &lightingShader, "alpha", alpha);
 
         //Desenha as linhas
         if(executaAlgoritmo && mostrarRaios){
@@ -281,12 +287,20 @@ void algoritmoVisibilidade(IndicesOpenGL* indicesLinhas){
 
         if(passoAlgoritmo == 0){
             tempoInicio = time(nullptr);
+
+            if(porcentagemPredios){
+                for(unsigned int i = 0; i < patrimonios.size; i++){
+                    Patrimonio* p = &patrimonios.array[i];
+                    p->maiorNumRaios = 0;
+                }
+            }
         }
 
         float tamanhoQuadrado = tamanhoLinhaGrid/numeroQuadradosLinha;
         float metadeGrid = tamanhoLinhaGrid/2.f;
         float metadeQuadrado = tamanhoQuadrado/2.f;
         int numeroQuadradosTotal = numeroQuadradosLinha*numeroQuadradosLinha;
+
         Patrimonio* patrimonio = getPatrimonio(patrimonioIndex);
 
         if(passoAlgoritmo == 0){
@@ -312,7 +326,9 @@ void algoritmoVisibilidade(IndicesOpenGL* indicesLinhas){
 
             //Calculando a visibilidade
             unsigned int numRaios = 0;
-            unsigned int maiorContRaios = 0;
+            //TODO: Inicializar talvez
+            vec3 pontoMaiorCont;
+            unsigned int maiorContRaios = 0; //Para o calculo da porcentadem, guarda o maior número de raios atingidoa em um ponto do patrimônio
             Vertice raios[raiosPorPonto * nPontosPatrimonio];
             for(unsigned int j = 0; j < nPontosPatrimonio; j++){
                 vec3 ponto(pontosPatrimonio[j].x, pontosPatrimonio[j].y, pontosPatrimonio[j].z);
@@ -342,21 +358,26 @@ void algoritmoVisibilidade(IndicesOpenGL* indicesLinhas){
                         acertou = true;
                     }
 
+                    //São salvos os raios apenas caso o algoritmo estiver sendo animado
                     if(animado && mostrarRaios){
                         raios[numRaios++] = (Vertice){pontoRaio.x, pontoRaio.y, pontoRaio.z};
                     }
 
+                    //Caso não estja sendo feito o cálculo da porcentagem e o algum raio atingiu o patrimônio acaba o loop
                     if(!comPorcentagem && acertou){
                         break;
                     }
                 }
 
+                //If para caso não esteja sendo feito o cálculo de porcentagem
                 if(!comPorcentagem && cont > 0){
+                    //Define-se "maiorContRaios" como "raiosPorPonto" para a porcentagem ser 100% e a cor da posição ser sólida
                     maiorContRaios = raiosPorPonto;
                     break;
                 }
 
                 if(cont > maiorContRaios){
+                    pontoMaiorCont = ponto;
                     maiorContRaios = cont;
                 }
             }
@@ -365,6 +386,10 @@ void algoritmoVisibilidade(IndicesOpenGL* indicesLinhas){
                 float porcentagem = float(maiorContRaios)/raiosPorPonto;
                 PontoChao novoPonto {(float)quadradoX, (float)quadradoY, porcentagem};
                 pontosVisiveisChao[numPontosVisiveisChao++] = novoPonto;
+
+                if(porcentagemPredios && porcentagem >= porcentagemMinimaParaPredios){
+                    visibilidadePredios(patrimonio->id, pontoMaiorCont);
+                }
             }
 
             if(mostrarRaios){
@@ -390,6 +415,59 @@ void algoritmoVisibilidade(IndicesOpenGL* indicesLinhas){
 
         if(gridIndices != nullptr){
             gerarTexturaPontosVisiveis(gridIndices->texture);
+        }
+    }
+}
+
+void visibilidadePredios(unsigned int patrimonioId, vec3 ponto){
+    vec3 up (0.0f, 1.0f, 0.0f);
+    vec3 visao = normalize(ponto - posPessoa) * tamanhoRaio;
+    vec3 vetorHorizontal = normalize(cross(up, visao));
+    vec3 vetorVertical = normalize(cross(visao, vetorHorizontal));
+    float fovMul = length(visao)*cos(fov/2);
+    vetorHorizontal *= fovMul;
+    vetorVertical *= fovMul;
+
+    for(unsigned int k = 0; k < raiosPorPonto; k++){
+        vec3 vx = vetorHorizontal * float_rand(-1.f, 1.f);
+        vec3 vy = vetorVertical * float_rand(-1.f, 1.f);
+        vec3 pontoRaio = vx + vy + visao + posPessoa;
+
+        Ray raio = {};
+        raio.length = tamanhoRaio;
+        raio.position = posPessoa;
+        raio.direction = pontoRaio - posPessoa;
+
+        unsigned int idMaisProximo = indexPatrimonioMaisProximo(raio);
+
+        if(idMaisProximo != patrimonioId && idMaisProximo > 0){
+            getPatrimonio(idMaisProximo)->numRaiosAtingidos++;
+        }
+    }
+
+    for(unsigned int i = 0; i < patrimonios.size; i++){
+        Patrimonio* p = &patrimonios.array[i];
+        if(p->numRaiosAtingidos > p->maiorNumRaios){
+            p->maiorNumRaios = p->numRaiosAtingidos;
+        }
+    }
+}
+
+void gerarAlphaPredios(float *cores){
+    unsigned int max = 0;
+
+    for(unsigned int i = 0; i < patrimonios.size; i++){
+        Patrimonio* p = &patrimonios.array[i];
+        if(p->maiorNumRaios > max){
+            max = p->maiorNumRaios;
+        }
+    }
+
+    for(unsigned int i = 0; i < patrimonios.size; i++){
+        if(max > 0) {
+            cores[i] = float(patrimonios.array[i].maiorNumRaios)/max;
+        }else{
+            cores[i] = 0;
         }
     }
 }
@@ -782,7 +860,7 @@ void inicializarBoundingBoxPatrimonios() {
     }
 }
 
-int indexPatrimonioMaisProximo(Ray raio){
+unsigned int indexPatrimonioMaisProximo(Ray raio){
     switch (tipoArvore){
         case OCTREE:
             return indexPatrimonioMaisProximo(raio, octree);
@@ -792,7 +870,7 @@ int indexPatrimonioMaisProximo(Ray raio){
             return indexPatrimonioMaisProximo(raio, kdtree);
         default:
             //TODO: Implementar pra caso nao ter nenhuma arvore inicializada
-            return -1;
+            return 0;
     }
 }
 

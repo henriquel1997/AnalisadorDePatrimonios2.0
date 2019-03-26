@@ -67,6 +67,14 @@ void DrawModel(Model* model, unsigned int shaderID){
     }
 }
 
+void DrawModelAttribs(Model *model, Shader *shader, const char *nomeAtributo, float *valores){
+    Mesh *meshes = model->meshes;
+    for (unsigned int i = 0; i < model->nMeshes; i++) {
+        shader->setFloat(nomeAtributo, valores[i]);
+        DrawMesh(&meshes[i], shader->ID);
+    }
+}
+
 unsigned int TextureFromFile(const char *path, const char* directory){
     char filename[strlen(path) + strlen(directory)];
     strcpy(filename, directory);
