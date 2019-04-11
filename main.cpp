@@ -73,15 +73,15 @@ unsigned int numeroQuadradosLinha = 50;
 unsigned int passoAlgoritmo = 0;
 float fov = 15.f;
 float tamanhoRaio = 3.0f;
-unsigned int raiosPorPonto = 500;
-bool comPorcentagem = true;
-bool porcentagemPredios = true;
+unsigned int raiosPorPonto = 200;
+bool comPorcentagem = false;
+bool porcentagemPredios = false;
 float porcentagemMinimaParaPredios = 0.3f;
 bool executaAlgoritmo = false;
 bool avancarSolto = false;
 bool avancarAlgoritmo = false; //Passo a passo
 bool animado = true;
-bool mostrarRaios = false;
+bool mostrarRaios = true;
 bool mostrarBoundingBox = true;
 time_t tempoInicio;
 
@@ -172,7 +172,7 @@ int main(){
         // input
         // -----
         processInput(window);
-        if(executaAlgoritmo){
+        if(executaAlgoritmo || avancarAlgoritmo){
             algoritmoVisibilidade(&linhasIndices);
         }
 
@@ -221,7 +221,7 @@ int main(){
         DrawModelAttribs(&modelo, &lightingShader, "alpha", alpha);
 
         //Desenha as linhas
-        if(executaAlgoritmo && mostrarRaios){
+        if(mostrarRaios){
             linhasShader.use();
             linhasShader.setMat4("projection", projection);
             linhasShader.setMat4("view", view);
@@ -311,7 +311,7 @@ void algoritmoVisibilidade(IndicesOpenGL* indicesLinhas){
             pontosVisiveisChao = (PontoChao*) malloc(sizeof(PontoChao) * numeroQuadradosTotal);
         }
 
-        for (int i = passoAlgoritmo; i < numeroQuadradosTotal; i++) {
+        for (unsigned int i = passoAlgoritmo; i < numeroQuadradosTotal; i++) {
 
             //Definindo a posição da pessoa na grid
             int quadradoX = i/numeroQuadradosLinha;
@@ -399,18 +399,25 @@ void algoritmoVisibilidade(IndicesOpenGL* indicesLinhas){
             }
 
             //Incrementado o passo e verificando se é necessário continuar executando o algoritmo
-            passoAlgoritmo++;
+            passoAlgoritmo = i+1;
 
             if(i == numeroQuadradosTotal - 1){
                 auto tempoFim = time(nullptr);
+                avancarAlgoritmo = false;
                 executaAlgoritmo = false;
                 printf("Tempo algoritmo: %f(s)\n", difftime(tempoFim, tempoInicio));
             }
 
-            if(animado || avancarAlgoritmo){
+            if(avancarAlgoritmo){
                 avancarAlgoritmo = false;
+                executaAlgoritmo = false;
                 break;
             }
+
+            if(animado){
+                break;
+            }
+
         }
 
         if(gridIndices != nullptr){
