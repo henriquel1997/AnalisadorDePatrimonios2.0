@@ -48,6 +48,8 @@ void testarTempoAlgoritmo();
 void testarTempoArvores();
 void setupPatrimonioAlgoritmo(Patrimonio* patrimonio);
 bool salvarScreenshot();
+void salvarMapa();
+void finalizarSalvamentoMapa();
 
 // settings
 const unsigned int SCR_WIDTH = 1600;
@@ -99,6 +101,8 @@ PontoChao* pontosVisiveisChao = nullptr;
 unsigned int nPontosPatrimonio = 0;
 Vertice* pontosPatrimonio = nullptr;
 IndicesOpenGL* gridIndices = nullptr;
+
+bool deveSalvarMapa = false;
 
 int main(){
     // glfw: initialize and configure
@@ -249,24 +253,12 @@ int main(){
             }
         }
 
-        //**HUD**//
-
-        // Create an orthograpic matrix for WIDTH and HEIGHT of your screen's drawing area
-//        auto ortho = glm::ortho(0.0f, (float)SCR_WIDTH, (float)SCR_HEIGHT, 0.0f);
-//
-//        glDisable(GL_DEPTH_TEST); // Disable the Depth-testing
-//
-//        glm::mat4 _guiMVP;
-//        auto guiMatrix = ortho * glm::mat4(1.0f); // Identity Matrix
-//
-//        //Desenhar aqui
-//
-//        glEnable(GL_DEPTH_TEST); // Enable the Depth-testing
-
-        // glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
-        // -------------------------------------------------------------------------------
         glfwSwapBuffers(window);
         glfwPollEvents();
+
+        if(deveSalvarMapa){
+            finalizarSalvamentoMapa();
+        }
     }
 
     // optional: de-allocate all resources once they've outlived their purpose:
@@ -977,6 +969,10 @@ void processInput(GLFWwindow *window){
     }
 
     if(glfwGetKey(window, GLFW_KEY_M) == GLFW_PRESS){
+        salvarMapa();
+    }
+
+    if(glfwGetKey(window, GLFW_KEY_N) == GLFW_PRESS){
         if(salvarScreenshot()){
             printf("Screenshot salva!");
         }else{
@@ -1113,4 +1109,24 @@ bool salvarScreenshot(){
     }
     free( buffer );
     return sucesso;
+}
+
+void salvarMapa(){
+    camera.saveOldValues();
+    float altura = (tamanhoLinhaGrid/2)/tan(radians(camera.Zoom/2));
+    camera.Position = vec3(0.f, altura, 0.f);
+    camera.Pitch = -90.f;
+    camera.Yaw = 0.f;
+    camera.updateCameraVectors();
+    deveSalvarMapa = true;
+}
+
+void finalizarSalvamentoMapa(){
+    if(salvarScreenshot()){
+        printf("Mapa salvo!\n");
+    }else{
+        printf("Erro ao salvar mapa.\n");
+    }
+    camera.goBackToOldValues();
+    deveSalvarMapa = false;
 }

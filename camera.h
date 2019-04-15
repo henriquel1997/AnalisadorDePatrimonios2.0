@@ -42,6 +42,10 @@ public:
     float MouseSensitivity;
     float Zoom;
 
+    glm::vec3 oldPosition;
+    float oldYaw;
+    float oldPitch;
+
     // Constructor with vectors
     Camera(glm::vec3 position = glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f), float yaw = YAW, float pitch = PITCH) : Front(glm::vec3(0.0f, 0.0f, -1.0f)), MovementSpeed(SPEED), MouseSensitivity(SENSITIVITY), Zoom(ZOOM)
     {
@@ -49,6 +53,9 @@ public:
         WorldUp = up;
         Yaw = yaw;
         Pitch = pitch;
+        oldPosition = position;
+        oldPitch = pitch;
+        oldYaw = yaw;
         updateCameraVectors();
     }
     // Constructor with scalar values
@@ -58,6 +65,9 @@ public:
         WorldUp = glm::vec3(upX, upY, upZ);
         Yaw = yaw;
         Pitch = pitch;
+        oldPosition = Position;
+        oldPitch = pitch;
+        oldYaw = yaw;
         updateCameraVectors();
     }
 
@@ -119,7 +129,6 @@ public:
             Zoom = 45.0f;
     }
 
-private:
     // Calculates the front vector from the Camera's (updated) Euler Angles
     void updateCameraVectors()
     {
@@ -133,6 +142,20 @@ private:
         Right = glm::normalize(glm::cross(Front, WorldUp));  // Normalize the vectors, because their length gets closer to 0 the more you look up or down which results in slower movement.
         Up    = glm::normalize(glm::cross(Right, Front));
     }
+
+    void saveOldValues(){
+        oldPosition = Position;
+        oldPitch = Pitch;
+        oldYaw = Yaw;
+    }
+
+    void goBackToOldValues(){
+        Position = oldPosition;
+        Pitch = oldPitch;
+        Yaw = oldYaw;
+        updateCameraVectors();
+    }
+
 };
 #endif
 
