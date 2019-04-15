@@ -65,7 +65,7 @@ enum TipoArvore {
     OCTREE, KDTREE, KDTREE_TRI, NENHUMA
 };
 
-TipoArvore tipoArvore = KDTREE;
+TipoArvore tipoArvore = OCTREE;
 Octree* octree = nullptr;
 KDTree* kdtree = nullptr;
 
@@ -157,8 +157,6 @@ int main(){
     Model modelo = loadModel(R"(../model/centro.obj)");
     inicializarPatrimonios(modelo);
     inicializarBoundingBoxPatrimonios();
-
-    testarTempoArvores();
 
     inicializarArvore();
 
