@@ -15,6 +15,9 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "stb_image_write.h"
+
 using namespace glm;
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
@@ -44,6 +47,7 @@ void gerarAlphaPredios(float *cores);
 void testarTempoAlgoritmo();
 void testarTempoArvores();
 void setupPatrimonioAlgoritmo(Patrimonio* patrimonio);
+bool salvarScreenshot();
 
 // settings
 const unsigned int SCR_WIDTH = 1600;
@@ -163,9 +167,6 @@ int main(){
     // render loop
     // -----------
     while (!glfwWindowShouldClose(window)){
-        glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
         // per-frame time logic
         // --------------------
         auto currentFrame = float(glfwGetTime());
@@ -181,6 +182,8 @@ int main(){
 
         // render
         // ------
+        glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         mat4 projection = perspective(radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
         mat4 view       = camera.GetViewMatrix();
@@ -972,6 +975,14 @@ void processInput(GLFWwindow *window){
         selecionarPatrimonio();
         printf("Index: %u\n", patrimonioIndex);
     }
+
+    if(glfwGetKey(window, GLFW_KEY_M) == GLFW_PRESS){
+        if(salvarScreenshot()){
+            printf("Screenshot salva!");
+        }else{
+            printf("Erro ao salvar Screenshot.");
+        }
+    }
 }
 
 // glfw: whenever the window size changed (by OS or user resize) this callback function executes
@@ -1084,4 +1095,22 @@ void testarTempoArvores(){
     printf("\n");
 
     tipoArvore = tipoInicial;
+}
+
+//Retirado de: https://github.com/capnramses/antons_opengl_tutorials_book/blob/master/10_screen_capture/main.cpp
+bool salvarScreenshot(){
+    bool sucesso = true;
+    auto *buffer = (unsigned char *)malloc( SCR_WIDTH * SCR_HEIGHT * 3 );
+    glReadPixels( 0, 0, SCR_WIDTH, SCR_HEIGHT, GL_RGB, GL_UNSIGNED_BYTE, buffer );
+    char name[1024];
+    long int t = time( NULL );
+    printf( "Salvando captura_%ld.png\n", t );
+    sprintf( name, "captura_%ld.png", t );
+    unsigned char *last_row = buffer + ( SCR_WIDTH * 3 * ( SCR_HEIGHT - 1 ) );
+    if ( !stbi_write_png( name, SCR_WIDTH, SCR_HEIGHT, 3, last_row, -3 * SCR_WIDTH ) ) {
+        fprintf( stderr, "ERROR: could not write screenshot file %s\n", name );
+        sucesso = false;
+    }
+    free( buffer );
+    return sucesso;
 }
