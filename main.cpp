@@ -20,6 +20,10 @@
 
 using namespace glm;
 
+// settings
+const unsigned int SCR_WIDTH = 1600;
+const unsigned int SCR_HEIGHT = 900;
+
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void mouse_callback(GLFWwindow* window, double xpos, double ypos);
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
@@ -47,13 +51,9 @@ void gerarAlphaPredios(float *cores);
 void testarTempoAlgoritmo();
 void testarTempoArvores();
 void setupPatrimonioAlgoritmo(Patrimonio* patrimonio);
-bool salvarScreenshot();
+bool salvarScreenshot(unsigned int inicioX = 0, unsigned int inicioY = 0, unsigned int width = SCR_WIDTH, unsigned int height = SCR_HEIGHT);
 void salvarMapa();
 void finalizarSalvamentoMapa();
-
-// settings
-const unsigned int SCR_WIDTH = 1600;
-const unsigned int SCR_HEIGHT = 900;
 
 // camera
 Camera camera(4.797128f, 4.923989f, 4.238231f, 0.f, 1.f, 0.f, -139.399979f, -45.899910f);
@@ -92,6 +92,7 @@ bool avancarAlgoritmo = false; //Passo a passo
 bool animado = true;
 bool mostrarRaios = true;
 bool mostrarBoundingBox = true;
+bool mostrarGrid = true;
 time_t tempoInicio;
 
 Lista<Patrimonio> patrimonios;
@@ -605,8 +606,8 @@ Patrimonio* getPatrimonio(unsigned int index){
     return p;
 }
 
-void gerarTexturaPontosVisiveis(unsigned int textureID){
-    struct Color{
+void gerarTexturaPontosVisiveis(unsigned int textureID) {
+    struct Color {
         unsigned char r;
         unsigned char g;
         unsigned char b;
@@ -616,30 +617,35 @@ void gerarTexturaPontosVisiveis(unsigned int textureID){
     unsigned int tamanhoQuadrado = 10;
 
     auto tamanhoLinha = numeroQuadradosLinha * tamanhoQuadrado;
-    auto* data = new Color[tamanhoLinha*tamanhoLinha];
-    for(unsigned int i = 0; i < tamanhoLinha; i++)
-        for(unsigned int j = 0; j < tamanhoLinha; j++)
-            data[i*tamanhoLinha + j] = (Color){ 0, 0, 0, 0};
+    Color data[tamanhoLinha * tamanhoLinha];
+    for (unsigned int i = 0; i < tamanhoLinha; i++)
+        for (unsigned int j = 0; j < tamanhoLinha; j++)
+            if(mostrarGrid && (i % tamanhoQuadrado == 0 || j % tamanhoQuadrado == 0 || i == tamanhoLinha - 1 || j == tamanhoLinha - 1)){
+                data[i * tamanhoLinha + j] = (Color) {255, 0, 0, 255};
+            }else{
+                data[i * tamanhoLinha + j] = (Color) {0, 0, 0, 0};
+            }
 
 
-    for(unsigned int i = 0; i < numPontosVisiveisChao; i++){
+    for (unsigned int i = 0; i < numPontosVisiveisChao; i++) {
         PontoChao ponto = pontosVisiveisChao[i];
-        auto x = (unsigned int)ponto.x;
-        auto y = (unsigned int)ponto.y;
+        auto x = (unsigned int) ponto.x;
+        auto y = (unsigned int) ponto.y;
 
-        for(unsigned int j = 0; j < tamanhoQuadrado; j++) {
-            for (unsigned int k = 0; k < tamanhoQuadrado; k++){
-                auto hor = y*tamanhoQuadrado + j;
-                auto ver = x*tamanhoQuadrado + k;
-                auto alpha = (unsigned char)(255*ponto.porcentagem);
-                data[hor*tamanhoLinha + ver] = (Color){ 255, 255, 0, alpha};
+        for (unsigned int j = 0; j < tamanhoQuadrado; j++) {
+            for (unsigned int k = 0; k < tamanhoQuadrado; k++) {
+                auto hor = y * tamanhoQuadrado + j;
+                auto ver = x * tamanhoQuadrado + k;
+                if (!mostrarGrid || (j != 0 && k != 0 && hor != tamanhoLinha -1 && j != tamanhoLinha - 1)) {
+                    auto alpha = (unsigned char) (255 * ponto.porcentagem);
+                    data[hor * tamanhoLinha + ver] = (Color) {255, 255, 0, alpha};
+                }
             }
         }
     }
 
     glBindTexture(GL_TEXTURE_2D, textureID);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, tamanhoLinha, tamanhoLinha, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
-    free(data);
 }
 
 IndicesOpenGL* inicializarGrid(){
@@ -979,6 +985,11 @@ void processInput(GLFWwindow *window){
             printf("Erro ao salvar Screenshot.");
         }
     }
+
+    if(glfwGetKey(window, GLFW_KEY_G) == GLFW_PRESS){
+        mostrarGrid = !mostrarGrid;
+        gerarTexturaPontosVisiveis(gridIndices->texture);
+    }
 }
 
 // glfw: whenever the window size changed (by OS or user resize) this callback function executes
@@ -1094,16 +1105,16 @@ void testarTempoArvores(){
 }
 
 //Retirado de: https://github.com/capnramses/antons_opengl_tutorials_book/blob/master/10_screen_capture/main.cpp
-bool salvarScreenshot(){
+bool salvarScreenshot(unsigned int inicioX, unsigned int inicioY, unsigned int width, unsigned int height){
     bool sucesso = true;
-    auto *buffer = (unsigned char *)malloc( SCR_WIDTH * SCR_HEIGHT * 3 );
-    glReadPixels( 0, 0, SCR_WIDTH, SCR_HEIGHT, GL_RGB, GL_UNSIGNED_BYTE, buffer );
+    auto *buffer = (unsigned char *)malloc( width * height * 3 );
+    glReadPixels( inicioX, inicioY, width, height, GL_RGB, GL_UNSIGNED_BYTE, buffer );
     char name[1024];
     long int t = time( NULL );
     printf( "Salvando captura_%ld.png\n", t );
     sprintf( name, "captura_%ld.png", t );
-    unsigned char *last_row = buffer + ( SCR_WIDTH * 3 * ( SCR_HEIGHT - 1 ) );
-    if ( !stbi_write_png( name, SCR_WIDTH, SCR_HEIGHT, 3, last_row, -3 * SCR_WIDTH ) ) {
+    unsigned char *last_row = buffer + ( width * 3 * ( height - 1 ) );
+    if ( !stbi_write_png( name, width, height, 3, last_row, -3 * width ) ) {
         fprintf( stderr, "ERROR: could not write screenshot file %s\n", name );
         sucesso = false;
     }
@@ -1122,7 +1133,8 @@ void salvarMapa(){
 }
 
 void finalizarSalvamentoMapa(){
-    if(salvarScreenshot()){
+    unsigned int inicioX = (SCR_WIDTH - SCR_HEIGHT)/2;
+    if(salvarScreenshot(inicioX, 0, SCR_HEIGHT, SCR_HEIGHT)){
         printf("Mapa salvo!\n");
     }else{
         printf("Erro ao salvar mapa.\n");
