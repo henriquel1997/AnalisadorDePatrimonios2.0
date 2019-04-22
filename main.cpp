@@ -328,7 +328,7 @@ double algoritmoVisibilidade(IndicesOpenGL* indicesLinhas, bool mostrarTempo){
             unsigned int numRaios = 0;
             //TODO: Inicializar talvez
             vec3 pontoMaiorCont;
-            unsigned int maiorContRaios = 0; //Para o calculo da porcentadem, guarda o maior número de raios atingidoa em um ponto do patrimônio
+            unsigned int maiorContRaios = 0; //Para o calculo da porcentagem, guarda o maior número de raios atingidoa em um ponto do patrimônio
             Vertice raios[raiosPorPonto * nPontosPatrimonio];
             for(unsigned int j = 0; j < nPontosPatrimonio; j++){
                 vec3 ponto(pontosPatrimonio[j].x, pontosPatrimonio[j].y, pontosPatrimonio[j].z);
