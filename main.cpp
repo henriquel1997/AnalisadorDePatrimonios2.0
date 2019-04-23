@@ -78,19 +78,19 @@ KDTree* kdtree = nullptr;
 //Algoritmo de Visibilidade
 unsigned int patrimonioIndex = 0;
 float tamanhoLinhaGrid = 5.f;
-unsigned int numeroQuadradosLinha = 50;
+unsigned int numeroQuadradosLinha = 100;
 unsigned int passoAlgoritmo = 0;
 float fov = 15.f;
 float tamanhoRaio = 3.0f;
 unsigned int raiosPorPonto = 200;
-bool comPorcentagem = true;
-bool porcentagemPredios = true;
+bool comPorcentagem = false;
+bool porcentagemPredios = false;
 float porcentagemMinimaParaPredios = 0.3f;
 bool executaAlgoritmo = false;
 bool avancarSolto = false;
 bool avancarAlgoritmo = false; //Passo a passo
-bool animado = true;
-bool mostrarRaios = true;
+bool animado = false;
+bool mostrarRaios = false;
 bool mostrarBoundingBox = true;
 bool mostrarGrid = true;
 time_t tempoInicio;
@@ -617,7 +617,8 @@ void gerarTexturaPontosVisiveis(unsigned int textureID) {
     unsigned int tamanhoQuadrado = 10;
 
     auto tamanhoLinha = numeroQuadradosLinha * tamanhoQuadrado;
-    Color data[tamanhoLinha * tamanhoLinha];
+    Color* data = new Color[tamanhoLinha * tamanhoLinha];
+
     for (unsigned int i = 0; i < tamanhoLinha; i++)
         for (unsigned int j = 0; j < tamanhoLinha; j++)
             if(mostrarGrid && (i % tamanhoQuadrado == 0 || j % tamanhoQuadrado == 0 || i == tamanhoLinha - 1 || j == tamanhoLinha - 1)){
