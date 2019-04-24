@@ -196,6 +196,7 @@ IndexDistance indexDistanceMaisProximo(IndexDistance indexDistance, Ray ray, Oct
 /*--- KD-Tree ---*/
 
 KDTree* BuildKDTree(BoundingBox regiao, Patrimonio* patrimonios, unsigned int nPatrimonios){
+
     std::vector<Patrimonio> vetor;
     for(unsigned int i = 0; i < nPatrimonios; i++){
         auto patrimonio = patrimonios[i];
@@ -203,10 +204,12 @@ KDTree* BuildKDTree(BoundingBox regiao, Patrimonio* patrimonios, unsigned int nP
             vetor.push_back(patrimonios[i]);
         }
     }
-    return BuildKDTree(regiao, vetor);
+
+    //TODO: Não deixar o nivel máximo hardcoded
+    return BuildKDTree(0, -1, regiao, vetor);
 }
 
-KDTree* BuildKDTree(BoundingBox regiao, std::vector<Patrimonio> patrimonios){
+KDTree* BuildKDTree(int nivel, int nivelMax, BoundingBox regiao, std::vector<Patrimonio> patrimonios){
 
     if(patrimonios.empty()){
         //KD-Tree não tem patrimônios
@@ -215,7 +218,7 @@ KDTree* BuildKDTree(BoundingBox regiao, std::vector<Patrimonio> patrimonios){
 
     auto kdtree = (KDTree*)malloc(sizeof(KDTree));
 
-    if(patrimonios.size() == 1){
+    if(patrimonios.size() == 1) {
         //É um nó folha
         kdtree->regiao = regiao;
         kdtree->patrimonio = (Patrimonio*)malloc(sizeof(Patrimonio));
@@ -224,8 +227,21 @@ KDTree* BuildKDTree(BoundingBox regiao, std::vector<Patrimonio> patrimonios){
         kdtree->menor = nullptr;
         kdtree->maior = nullptr;
 
+    } else if(nivelMax >= 0 && nivel >= nivelMax) {
+        //Se o nivelMax for negativo, não tem limite de nivel
+        //É um nó folha com mais de um patrimônio
+        kdtree->regiao = regiao;
+        kdtree->patrimonio = (Patrimonio*)malloc(sizeof(Patrimonio) * patrimonios.size());
+
+        for(unsigned int i = 0; i < patrimonios.size(); i++){
+            kdtree->patrimonio[i] = patrimonios[i];
+        }
+
+        kdtree->triangulo = nullptr;
+        kdtree->menor = nullptr;
+        kdtree->maior = nullptr;
     } else {
-        //KD-Tree tem mais de um patrimônio, logo não é um nó folha
+        //KD-Tree tem mais de um patrimônio e está antes do nível máximo, logo não é um nó folha
         auto nPatrimonios = patrimonios.size();
         vec3 media = {0.f, 0.f, 0.f};
         vec3 centros[nPatrimonios];
@@ -309,8 +325,8 @@ KDTree* BuildKDTree(BoundingBox regiao, std::vector<Patrimonio> patrimonios){
                 regiaoMaior.min.z = valorEixo;
                 break;
         }
-        kdtree->menor = BuildKDTree(regiaoMenor, patrimoniosMenor);
-        kdtree->maior = BuildKDTree(regiaoMaior, patrimoniosMaior);
+        kdtree->menor = BuildKDTree(nivel + 1, nivelMax, regiaoMenor, patrimoniosMenor);
+        kdtree->maior = BuildKDTree(nivel + 1, nivelMax, regiaoMaior, patrimoniosMaior);
         kdtree->patrimonio = nullptr;
         kdtree->triangulo = nullptr;
     }
@@ -350,10 +366,6 @@ KDTree* BuildKDTreeTriangulos(BoundingBox regiao, std::vector<Patrimonio> patrim
                 b = vertdata[i*3 + 1];
                 c = vertdata[i*3 + 2];
             }
-
-//            a = Vector3Transform(a, model->transform);
-//            b = Vector3Transform(b, model->transform);
-//            c = Vector3Transform(c, model->transform);
 
             triangulos.push_back((Triangulo){vec3(a.Position.x, a.Position.y, a.Position.z),
                                              vec3(b.Position.x, b.Position.y, b.Position.z),
@@ -578,18 +590,3 @@ IndexDistance indexDistanceMaisProximo(IndexDistance indexDistance, Ray ray, KDT
 
     return indexDistance;
 }
-
-//void desenharKDTree(KDTree *kdtree, Color corFilhos, Color corSemFilhos){
-//    if(kdtree != nullptr){
-//        desenharKDTree(kdtree->menor, corFilhos, corSemFilhos);
-//        desenharKDTree(kdtree->maior, corFilhos, corSemFilhos);
-//
-//        Color cor;
-//        if(kdtree->patrimonio == nullptr){
-//            cor = corSemFilhos;
-//        }else{
-//            cor = corFilhos;
-//        }
-//        DrawBoundingBox(kdtree->regiao, cor);
-//    }
-//}
