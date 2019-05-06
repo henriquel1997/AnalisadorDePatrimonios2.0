@@ -18,11 +18,6 @@ struct IndicesOpenGL{
     unsigned int texture;
 };
 
-struct BoundingBox{
-    vec3 min;
-    vec3 max;
-};
-
 struct Patrimonio {
     unsigned int id;
     Mesh mesh;

@@ -162,8 +162,8 @@ int main(){
     auto linhasIndices = inicializarLinhas();
 
     //Carregando o modelo e inicializando os Patrimônios
-    //Model modelo = loadModel(R"(../model/CentroFortaleza.fbx)");
-    Model modelo = loadModel(R"(../model/centro.obj)");
+    Model modelo = loadModel(R"(../model/fortaleza.obj)", boundingBoxGrid(), 0.0075f);
+    //Model modelo = loadModel(R"(../model/centro.obj)", boundingBoxGrid());
     inicializarPatrimonios(modelo);
     inicializarBoundingBoxPatrimonios();
 
@@ -654,8 +654,8 @@ IndicesOpenGL* inicializarGrid(){
 
     float gridVertices[] = {
             // positions                       // texture coords
-             metadeGrid,  0.0f,  metadeGrid,   1.0f, 1.0f, // top right
-             metadeGrid,  0.0f, -metadeGrid,   1.0f, 0.0f, // bottom right
+            metadeGrid,  0.0f,  metadeGrid,   1.0f, 1.0f, // top right
+            metadeGrid,  0.0f, -metadeGrid,   1.0f, 0.0f, // bottom right
             -metadeGrid,  0.0f, -metadeGrid,   0.0f, 0.0f, // bottom left
             -metadeGrid,  0.0f,  metadeGrid,   0.0f, 1.0f  // top left
     };

@@ -45,15 +45,20 @@ struct Model{
     const char* directory;
 };
 
+struct BoundingBox{
+    glm::vec3 min;
+    glm::vec3 max;
+};
+
 void setupMesh(Mesh* mesh);
 void DrawMesh(Mesh* mesh, unsigned int shaderID);
 void DrawModel(Model* model, unsigned int shaderID);
 void DrawModelAttribs(Model *model, Shader *shader, const char *nomeAtributo, float *valores);
 unsigned int TextureFromFile(const char *path, const char* directory);
 void loadMaterialTextures(Mesh* mesh, unsigned int currentIndex, aiMaterial *mat, aiTextureType type, const char* directory);
-Mesh processMesh(aiMesh *aiMesh, const aiScene *scene, const char* directory);
-void processNode(Model* model, aiNode *node, const aiScene *scene);
-Model loadModel(const char* filepath);
+Mesh processMesh(aiMesh *aiMesh, const aiScene *scene, const char* directory, float scale);
+unsigned int processNode(Model* model, aiNode *node, const aiScene *scene, unsigned int currentMesh, BoundingBox* bBox, float scale);
+Model loadModel(const char* path, BoundingBox bBox, float scale = 1.f);
 void freeModel(Model* model);
 
 #endif

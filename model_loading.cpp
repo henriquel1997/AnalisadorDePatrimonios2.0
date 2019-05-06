@@ -126,17 +126,19 @@ void loadMaterialTextures(Mesh* mesh, unsigned int currentIndex, aiMaterial *mat
     }
 }
 
-Mesh processMesh(aiMesh *aiMesh, const aiScene *scene, const char* directory){
+Mesh processMesh(aiMesh *aiMesh, const aiScene *scene, const char* directory, float scale){
 
     Mesh mesh = {};
     mesh.nVertices = aiMesh->mNumVertices;
     mesh.vertices = (Vertex*) malloc(sizeof(Vertex) * mesh.nVertices);
 
+    glm::vec3 transform = {scale, scale, scale};
+
     for(unsigned int i = 0; i < aiMesh->mNumVertices; i++){
         Vertex vertex = {};
         // process vertex positions, normals and texture coordinates
         vertex.Position = glm::vec3(aiMesh->mVertices[i].x, aiMesh->mVertices[i].y, aiMesh->mVertices[i].z);
-        vertex.Normal = glm::vec3(aiMesh->mNormals[i].x,aiMesh->mNormals[i].y, aiMesh->mNormals[i].z);
+        vertex.Normal = glm::vec3(aiMesh->mNormals[i].x ,aiMesh->mNormals[i].y, aiMesh->mNormals[i].z);
 
         // does the mesh contain texture coordinates?
         if(aiMesh->mTextureCoords[0]){
@@ -145,8 +147,14 @@ Mesh processMesh(aiMesh *aiMesh, const aiScene *scene, const char* directory){
             vertex.TexCoords = glm::vec2(0.0f, 0.0f);
         }
 
+        vertex.Position *= transform;
+        vertex.Normal *= transform;
+        //Essa parte da textura pode estar errada
+        //vertex.TexCoords *= transform;
+
         mesh.vertices[i] = vertex;
     }
+
     // process indices
     mesh.nIndices = aiMesh->mNumFaces * 3; // Assumindo que todas as faces são triângulos
     mesh.indices = (unsigned int*) malloc(sizeof(unsigned int*) * mesh.nIndices);
@@ -176,23 +184,46 @@ Mesh processMesh(aiMesh *aiMesh, const aiScene *scene, const char* directory){
     return mesh;
 }
 
+bool meshIsInsideBoundingBox(aiMesh *mesh, BoundingBox* bBox, float scale){
+
+    for(unsigned int i = 0; i < mesh->mNumVertices; i++){
+        auto vertice = mesh->mVertices[i] * scale;
+        if(vertice.x > bBox->max.x ||
+           vertice.y > bBox->max.y ||
+           vertice.z > bBox->max.z ||
+           vertice.x < bBox->min.x ||
+           vertice.y < bBox->min.y ||
+           vertice.z < bBox->min.z)
+        {
+            return false;
+        }
+    }
+
+    return true;
+}
+
 //Retorna o index atual do array de mesh
-unsigned int processNode(Model* model, aiNode *node, const aiScene *scene, unsigned int currentMesh){
+unsigned int processNode(Model* model, aiNode *node, const aiScene *scene, unsigned int currentMesh, BoundingBox* bBox, float scale){
+
     // process all the node's meshes (if any)
     for(unsigned int i = 0; i < node->mNumMeshes; i++){
         aiMesh *mesh = scene->mMeshes[node->mMeshes[i]];
-        model->meshes[currentMesh++] = processMesh(mesh, scene, model->directory);
+        if(meshIsInsideBoundingBox(mesh, bBox, scale)){
+            model->meshes[currentMesh++] = processMesh(mesh, scene, model->directory, scale);
+        }else{
+            model->nMeshes--;
+        }
     }
 
     // then do the same for each of its children
     for(unsigned int i = 0; i < node->mNumChildren; i++){
-        currentMesh = processNode(model, node->mChildren[i], scene, currentMesh);
+        currentMesh = processNode(model, node->mChildren[i], scene, currentMesh, bBox, scale);
     }
 
     return currentMesh;
 }
 
-Model loadModel(const char* path){
+Model loadModel(const char* path, BoundingBox bBox, float scale){
     const aiScene* scene = aiImportFile( path, aiProcess_Triangulate | aiProcess_FlipUVs);
 
     //Removendo o nome do arquivo do diretório
@@ -222,7 +253,16 @@ Model loadModel(const char* path){
     if(nMeshes > 0){
         model.nMeshes = nMeshes;
         model.meshes = (Mesh*) malloc(sizeof(Mesh) * nMeshes);
-        processNode(&model, scene->mRootNode, scene, 0);
+        processNode(&model, scene->mRootNode, scene, 0, &bBox, scale);
+    }
+
+    if(model.nMeshes < scene->mNumMeshes){
+        auto newArray = (Mesh*)malloc(model.nMeshes * sizeof(Mesh));
+        for(unsigned int i = 0; i < model.nMeshes; i++){
+            newArray[i] = model.meshes[i];
+        }
+        free(model.meshes);
+        model.meshes = newArray;
     }
 
     aiReleaseImport(scene);

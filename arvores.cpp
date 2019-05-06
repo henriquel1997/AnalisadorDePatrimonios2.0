@@ -206,7 +206,7 @@ KDTree* BuildKDTree(BoundingBox regiao, Patrimonio* patrimonios, unsigned int nP
     }
 
     //TODO: Não deixar o nivel máximo hardcoded
-    return BuildKDTree(0, -1, regiao, vetor);
+    return BuildKDTree(0, 15, regiao, vetor);
 }
 
 KDTree* BuildKDTree(int nivel, int nivelMax, BoundingBox regiao, std::vector<Patrimonio> patrimonios){
