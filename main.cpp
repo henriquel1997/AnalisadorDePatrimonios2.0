@@ -89,7 +89,7 @@ float porcentagemMinimaParaPredios = 0.3f;
 bool executaAlgoritmo = false;
 bool avancarSolto = false;
 bool avancarAlgoritmo = false; //Passo a passo
-bool animado = false;
+bool animado = true;
 bool mostrarRaios = false;
 bool mostrarBoundingBox = true;
 bool mostrarGrid = true;
@@ -166,6 +166,8 @@ int main(){
     //Model modelo = loadModel(R"(../model/centro.obj)", boundingBoxGrid());
     inicializarPatrimonios(modelo);
     inicializarBoundingBoxPatrimonios();
+
+    //testarTempoArvores();
 
     inicializarArvore();
 
@@ -329,7 +331,8 @@ double algoritmoVisibilidade(IndicesOpenGL* indicesLinhas, bool mostrarTempo){
             //TODO: Inicializar talvez
             vec3 pontoMaiorCont;
             unsigned int maiorContRaios = 0; //Para o calculo da porcentagem, guarda o maior número de raios atingidoa em um ponto do patrimônio
-            Vertice raios[raiosPorPonto * nPontosPatrimonio];
+            auto raios = new Vertice[raiosPorPonto * nPontosPatrimonio];
+
             for(unsigned int j = 0; j < nPontosPatrimonio; j++){
                 vec3 ponto(pontosPatrimonio[j].x, pontosPatrimonio[j].y, pontosPatrimonio[j].z);
                 vec3 up (0.0f, 1.0f, 0.0f);
@@ -399,6 +402,8 @@ double algoritmoVisibilidade(IndicesOpenGL* indicesLinhas, bool mostrarTempo){
                     updateRaios(indicesLinhas);
                 }
             }
+
+            free(raios);
 
             //Incrementado o passo e verificando se é necessário continuar executando o algoritmo
             passoAlgoritmo = i+1;
@@ -617,7 +622,7 @@ void gerarTexturaPontosVisiveis(unsigned int textureID) {
     unsigned int tamanhoQuadrado = 10;
 
     auto tamanhoLinha = numeroQuadradosLinha * tamanhoQuadrado;
-    Color* data = new Color[tamanhoLinha * tamanhoLinha];
+    auto data = new Color[tamanhoLinha * tamanhoLinha];
 
     for (unsigned int i = 0; i < tamanhoLinha; i++)
         for (unsigned int j = 0; j < tamanhoLinha; j++)
@@ -647,6 +652,7 @@ void gerarTexturaPontosVisiveis(unsigned int textureID) {
 
     glBindTexture(GL_TEXTURE_2D, textureID);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, tamanhoLinha, tamanhoLinha, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+    free(data);
 }
 
 IndicesOpenGL* inicializarGrid(){
@@ -908,6 +914,9 @@ Ray getCameraRay(Camera camera){
 void setupPatrimonioAlgoritmo(Patrimonio* patrimonio){
     patrimonioIndex = patrimonio->id;
     nPontosPatrimonio = patrimonio->mesh.nVertices;
+    if(pontosPatrimonio != nullptr){
+        free(pontosPatrimonio);
+    }
     pontosPatrimonio = (Vertice*)malloc(sizeof(Vertice) * nPontosPatrimonio);
     for(unsigned int i = 0; i < nPontosPatrimonio; i++){
         vec3 v = patrimonio->mesh.vertices[i].Position;
@@ -1063,13 +1072,16 @@ void testarTempoAlgoritmo(){
     bool flagAnimadoAntigo = animado;
     animado = false;
 
+    unsigned int pulo = patrimonios.size / 22;
+
     double tempos[patrimonios.size];
-    for(unsigned int i = 0; i < patrimonios.size; i++){
+    for(unsigned int i = 0; i < patrimonios.size; i += pulo){
+        printf("Tempo Patrimonio %i: ", i);
         setupPatrimonioAlgoritmo(&patrimonios.array[i]);
         passoAlgoritmo = 0;
         auto tempo = algoritmoVisibilidade(nullptr);
         tempos[i] = tempo;
-        printf("Tempo Patrimonio %i: %f\n", patrimonioIndex, tempo);
+        printf("%f\n", tempo);
     }
 
     double media = 0;
@@ -1085,10 +1097,10 @@ void testarTempoAlgoritmo(){
 void testarTempoArvores(){
     auto tipoInicial = tipoArvore;
 
-    tipoArvore = NENHUMA;
-    printf("Tempo Sem Arvore:\n\n");
-    testarTempoAlgoritmo();
-    printf("\n");
+//    tipoArvore = NENHUMA;
+//    printf("Tempo Sem Arvore:\n\n");
+//    testarTempoAlgoritmo();
+//    printf("\n");
 
     tipoArvore = OCTREE;
     inicializarArvore();
@@ -1096,11 +1108,11 @@ void testarTempoArvores(){
     testarTempoAlgoritmo();
     printf("\n");
 
-    tipoArvore = KDTREE;
-    inicializarArvore();
-    printf("Tempo KD-Tree:\n\n");
-    testarTempoAlgoritmo();
-    printf("\n");
+//    tipoArvore = KDTREE;
+//    inicializarArvore();
+//    printf("Tempo KD-Tree:\n\n");
+//    testarTempoAlgoritmo();
+//    printf("\n");
 
     tipoArvore = tipoInicial;
 }
