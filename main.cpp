@@ -56,6 +56,7 @@ void setupPatrimonioAlgoritmo(Patrimonio* patrimonio);
 bool salvarScreenshot(unsigned int inicioX = 0, unsigned int inicioY = 0, unsigned int width = SCR_WIDTH, unsigned int height = SCR_HEIGHT);
 void salvarMapa();
 void finalizarSalvamentoMapa();
+void selecionarPatrimoniosFortaleza();
 
 // camera
 Camera camera(4.797128f, 4.923989f, 4.238231f, 0.f, 1.f, 0.f, -139.399979f, -45.899910f);
@@ -74,13 +75,13 @@ enum TipoArvore {
     OCTREE, KDTREE, KDTREE_TRI, NENHUMA
 };
 
-TipoArvore tipoArvore = KDTREE;
+TipoArvore tipoArvore = OCTREE;
 Octree* octree = nullptr;
 KDTree* kdtree = nullptr;
 
 //Algoritmo de Visibilidade
 float tamanhoLinhaGrid = 5.f;
-unsigned int numeroQuadradosLinha = 100;
+unsigned int numeroQuadradosLinha = 200;
 unsigned int passoAlgoritmo = 0;
 float fov = 15.f;
 float tamanhoRaio = 3.0f;
@@ -91,7 +92,7 @@ float porcentagemMinimaParaPredios = 0.3f;
 bool executaAlgoritmo = false;
 bool avancarSolto = false;
 bool avancarAlgoritmo = false; //Passo a passo
-bool animado = true;
+bool animado = false;
 bool mostrarRaios = false;
 bool mostrarBoundingBox = true;
 bool mostrarGrid = true;
@@ -167,8 +168,8 @@ int main(){
     auto linhasIndices = inicializarLinhas();
 
     //Carregando o modelo e inicializando os Patrimônios
-    //Model modelo = loadModel(R"(../model/fortaleza.obj)", boundingBoxGrid(), 0.0075f);
-    Model modelo = loadModel(R"(../model/centro.obj)", boundingBoxGrid());
+    Model modelo = loadModel(R"(../model/fortaleza.obj)", boundingBoxGrid(), 0.005f);
+    //Model modelo = loadModel(R"(../model/centro.obj)", boundingBoxGrid());
     inicializarPatrimonios(modelo);
     inicializarBoundingBoxPatrimonios();
 
@@ -322,12 +323,17 @@ double algoritmoVisibilidade(IndicesOpenGL* indicesLinhas, bool mostrarTempo){
             pontosVisiveisChao = (PontoChao*) malloc(sizeof(PontoChao) * numeroQuadradosTotal);
         }
 
-        Patrimonio patrimonios [numPatrimoniosSelecionados];
+        Patrimonio patrimoniosSelecionados [numPatrimoniosSelecionados];
         for(unsigned int i = 0; i < numPatrimoniosSelecionados; i++){
-            patrimonios[i] = *getPatrimonio(patrimonioIndex[i]);
+            patrimoniosSelecionados[i] = *getPatrimonio(patrimonioIndex[i]);
         }
 
         for (unsigned int i = passoAlgoritmo; i < numeroQuadradosTotal; i++) {
+
+            //Mostrando porcentagem completa da análise
+            if(i % (numeroQuadradosTotal/10) == 0){
+                printf("Análise %u %% completa.\n", i/numeroQuadradosTotal);
+            }
 
             //Definindo a posição da pessoa na grid
             int quadradoX = i/numeroQuadradosLinha;
@@ -343,7 +349,6 @@ double algoritmoVisibilidade(IndicesOpenGL* indicesLinhas, bool mostrarTempo){
 
             //Calculando a visibilidade
             unsigned int numRaios = 0;
-            //TODO: Inicializar talvez
             vec3 pontoMaiorCont;
             unsigned int maiorContRaios = 0; //Para o calculo da porcentagem, guarda o maior número de raios atingidoa em um ponto do patrimônio
             auto raios = new Vertice[raiosPorPonto * nPontosPatrimonio];
@@ -371,7 +376,7 @@ double algoritmoVisibilidade(IndicesOpenGL* indicesLinhas, bool mostrarTempo){
 
 
                     bool acertou = false;
-                    if(isPatrimonioTheClosestHit(patrimonios, &raio)){
+                    if(isPatrimonioTheClosestHit(patrimoniosSelecionados, &raio)){
                         cont++;
                         acertou = true;
                     }
@@ -430,6 +435,19 @@ double algoritmoVisibilidade(IndicesOpenGL* indicesLinhas, bool mostrarTempo){
                 tempoTotal = tempoFim - tempoInicio;
                 if(mostrarTempo){
                     printf("Tempo algoritmo: %f(s)\n", tempoTotal);
+
+                    if(tipoArvore == OCTREE){
+                        printf("Numero de checagens Octree: %i\n", getNumChecagensOctree());
+                    }else if(tipoArvore == KDTREE){
+                        printf("Numero de checagens KD-Tree: %i\n", getNumChecagensKDTree());
+                    }
+
+                    if(porcentagemPredios){
+                        printf("Porcentagem prédios:\n");
+                        for(unsigned int j = 0; j < patrimonios.size; j++){
+                            printf("Prédio %u: %u\n", patrimonios.array[j].id, patrimonios.array[j].maiorNumRaios);
+                        }
+                    }
                 }
             }
 
@@ -1067,6 +1085,8 @@ void processInput(GLFWwindow *window){
     if(glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS){
         auto numSelecionadosAntigo = numPatrimoniosSelecionados;
         selecionarPatrimonio();
+        printf("Num. Patrimonios Selecionados: %u\n", numPatrimoniosSelecionados);
+        printf("Num. Pontos Patrimonio: %u\n", nPontosPatrimonio);
         if(numPatrimoniosSelecionados > numSelecionadosAntigo){
             printf("Index: %u\n", patrimonioIndex[numPatrimoniosSelecionados - 1]);
         }
@@ -1087,6 +1107,21 @@ void processInput(GLFWwindow *window){
     if(glfwGetKey(window, GLFW_KEY_G) == GLFW_PRESS){
         mostrarGrid = !mostrarGrid;
         gerarTexturaPontosVisiveis(gridIndices->texture);
+    }
+
+    if(glfwGetKey(window, GLFW_KEY_P) == GLFW_PRESS){
+        printf("Patrimopnios Selecionados: ");
+        for(unsigned int i = 0; i < numPatrimoniosSelecionados; i++){
+            if(i != numPatrimoniosSelecionados - 1){
+                printf("%u,", patrimonioIndex[i]);
+            }else{
+                printf("%u\n", patrimonioIndex[i]);
+            }
+        }
+    }
+
+    if(glfwGetKey(window, GLFW_KEY_F) == GLFW_PRESS){
+        selecionarPatrimoniosFortaleza();
     }
 }
 
@@ -1221,6 +1256,13 @@ void testarTempoArvores(){
 //    printf("\n");
 
     tipoArvore = tipoInicial;
+}
+
+void selecionarPatrimoniosFortaleza(){
+    unsigned int patrimoniosFortaleza[] = {4700,4879,4843,317,3088,4561,4140,4132,3617,2159,189,6038,1034,3924,433,1752,839,1789,6033,1088,3985,2431,1379,1272,4075,5353,3584,2026,1015,325,5201,2279,4902,5718,3064,4268};
+    for(auto id : patrimoniosFortaleza){
+        setupPatrimonioAlgoritmo(getPatrimonio(id));
+    }
 }
 
 //Retirado de: https://github.com/capnramses/antons_opengl_tutorials_book/blob/master/10_screen_capture/main.cpp

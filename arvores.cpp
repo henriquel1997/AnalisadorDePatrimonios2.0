@@ -4,6 +4,9 @@
 
 #include "arvores.h"
 
+unsigned int numChecagensOctree = 0;
+unsigned int numChecagensKDTree = 0;
+
 /*--- Octree ---*/
 
 //Libera a memória da octree e de seus filhos
@@ -153,6 +156,7 @@ bool existeUmPatrimonioMaisProximo(int patrimonioIndex, float patrimonioDistance
 
     if(checkCollisionRayBox(&ray, &octree->regiao)){
         for(int i = 0; i < octree->numeroPatrimonios; i++){
+            numChecagensOctree++;
             Patrimonio patrimonio = octree->patrimonios[i];
             if(patrimonio.id != patrimonioIndex && checkCollisionRayBox(&ray, &patrimonio.bBox)){
                 RayHitInfo newHitInfo = RayHitMesh(&ray, &patrimonio.mesh);
@@ -202,6 +206,10 @@ IndexDistance indexDistanceMaisProximo(IndexDistance indexDistance, Ray ray, Oct
     }
 
     return indexDistance;
+}
+
+unsigned int getNumChecagensOctree(){
+    return numChecagensOctree;
 }
 
 /*--- KD-Tree ---*/
@@ -547,6 +555,8 @@ bool isPatrimonioTheClosestHit(Patrimonio* patrimonios, unsigned int numPatrimon
 bool existeUmPatrimonioMaisProximo(int patrimonioIndex, float patrimonioDistance, Ray ray, KDTree* kdtree){
     if(kdtree != nullptr && checkCollisionRayBox(&ray, &kdtree->regiao)){
 
+        numChecagensKDTree++;
+
         Triangulo* triangulo = kdtree->triangulo;
         Patrimonio* patrimonio = kdtree->patrimonio;
         if(triangulo != nullptr && triangulo->patrimonio->id != patrimonioIndex){
@@ -613,4 +623,8 @@ IndexDistance indexDistanceMaisProximo(IndexDistance indexDistance, Ray ray, KDT
     }
 
     return indexDistance;
+}
+
+unsigned int getNumChecagensKDTree(){
+    return numChecagensKDTree;
 }
