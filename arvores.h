@@ -35,7 +35,7 @@ void UnloadOctree(Octree* octree);
 bool boxContainsBox(BoundingBox fora, BoundingBox dentro);
 Octree* BuildOctree(BoundingBox regiao, Patrimonio* patrimonios, unsigned int nPatrimonios);
 Octree* BuildOctree(BoundingBox regiao, std::vector<Patrimonio> patrimonios);
-bool isPatrimonioTheClosestHit(Patrimonio* patrimonio, Ray* ray, Octree *octree);
+bool isPatrimonioTheClosestHit(Patrimonio* patrimonios, unsigned int numPatrimonios, Ray* ray, Octree *octree);
 bool existeUmPatrimonioMaisProximo(int patrimonioIndex, float patrimonioDistance, Ray ray, Octree *octree);
 unsigned int indexPatrimonioMaisProximo(Ray ray, Octree *octree);
 IndexDistance indexDistanceMaisProximo(IndexDistance indexDistance, Ray ray, Octree *octree);
@@ -58,7 +58,7 @@ KDTree* BuildKDTreeTriangulos(BoundingBox regiao, Patrimonio* patrimonios, unsig
 KDTree* BuildKDTreeTriangulos(BoundingBox regiao, std::vector<Patrimonio> patrimonios);
 KDTree* BuildKDTree(BoundingBox regiao, std::vector<Triangulo> triangulos);
 void UnloadKDTree(KDTree* kdtree);
-bool isPatrimonioTheClosestHit(Patrimonio* patrimonio, Ray* ray, KDTree* kdtree);
+bool isPatrimonioTheClosestHit(Patrimonio* patrimonios, unsigned int numPatrimonios, Ray* ray, KDTree* kdtree);
 bool existeUmPatrimonioMaisProximo(int patrimonioIndex, float patrimonioDistance, Ray ray, KDTree* kdtree);
 unsigned int indexPatrimonioMaisProximo(Ray ray, KDTree *kdtree);
 IndexDistance indexDistanceMaisProximo(IndexDistance indexDistance, Ray ray, KDTree *kdtree);

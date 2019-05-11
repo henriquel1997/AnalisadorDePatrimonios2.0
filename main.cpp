@@ -38,16 +38,18 @@ IndicesOpenGL inicializarLinhas();
 void updateRaios(IndicesOpenGL* indicesGL, const float *verticesRaio = nullptr, unsigned int nRaios = 0);
 void gerarTexturaPontosVisiveis(unsigned int textureID);
 float float_rand( float min, float max);
-bool isPatrimonioTheClosestHit(Patrimonio* patrimonio, Ray* raio);
+bool isPatrimonioTheClosestHit(Patrimonio* patrimonios, Ray* raio);
 void inicializarPatrimonios(Model modelo);
 Patrimonio* getPatrimonio(unsigned int index);
 double algoritmoVisibilidade(IndicesOpenGL* indicesLinhas, bool mostrarTempo = false);
-void visibilidadePredios(unsigned int patrimonioId, vec3 ponto);
+void visibilidadePredios(vec3 ponto);
 void inicializarBoundingBoxPatrimonios();
 Ray getCameraRay(Camera camera);
 unsigned int indexPatrimonioMaisProximo(Ray raio);
+bool patrimonioEstaSelecionado(unsigned int id);
 bool estaDentroDeUmPatrimonio();
 void gerarAlphaPredios(float *cores);
+void gerarArraySelecionados(bool* selecionados);
 void testarTempoAlgoritmo();
 void testarTempoArvores();
 void setupPatrimonioAlgoritmo(Patrimonio* patrimonio);
@@ -66,6 +68,7 @@ float deltaTime = 0.0f;
 float lastFrame = 0.0f;
 
 vec3 posPessoa(0.f, .1f, 0.f);
+vec2 posPessoaGrid(0.f, 0.f);
 
 enum TipoArvore {
     OCTREE, KDTREE, KDTREE_TRI, NENHUMA
@@ -76,7 +79,6 @@ Octree* octree = nullptr;
 KDTree* kdtree = nullptr;
 
 //Algoritmo de Visibilidade
-unsigned int patrimonioIndex = 0;
 float tamanhoLinhaGrid = 5.f;
 unsigned int numeroQuadradosLinha = 100;
 unsigned int passoAlgoritmo = 0;
@@ -99,6 +101,9 @@ Lista<Patrimonio> patrimonios;
 unsigned int numPontosVisiveisChao = 0;
 PontoChao* pontosVisiveisChao = nullptr;
 
+const unsigned int maxPatrimoniosSelecionados = 512;
+unsigned int numPatrimoniosSelecionados = 0;
+unsigned int patrimonioIndex [maxPatrimoniosSelecionados];
 unsigned int nPontosPatrimonio = 0;
 Vertice* pontosPatrimonio = nullptr;
 IndicesOpenGL* gridIndices = nullptr;
@@ -162,8 +167,8 @@ int main(){
     auto linhasIndices = inicializarLinhas();
 
     //Carregando o modelo e inicializando os Patrimônios
-    Model modelo = loadModel(R"(../model/fortaleza.obj)", boundingBoxGrid(), 0.0075f);
-    //Model modelo = loadModel(R"(../model/centro.obj)", boundingBoxGrid());
+    //Model modelo = loadModel(R"(../model/fortaleza.obj)", boundingBoxGrid(), 0.0075f);
+    Model modelo = loadModel(R"(../model/centro.obj)", boundingBoxGrid());
     inicializarPatrimonios(modelo);
     inicializarBoundingBoxPatrimonios();
 
@@ -228,10 +233,16 @@ int main(){
         // render model
         model = mat4(1.0f);
         lightingShader.setMat4("model", model);
-        lightingShader.setVec3("secondColor", vec3(0.f, 0.f, 1.f));
-        float alpha[patrimonios.size];
-        gerarAlphaPredios(alpha);
-        DrawModelAttribs(&modelo, &lightingShader, "alpha", alpha);
+        lightingShader.setVec3("corSelecionado", vec3(0.f, 1.f, 0.f));
+        lightingShader.setVec3("alphaColor", vec3(0.f, 0.f, 1.f));
+
+        float alphas[patrimonios.size];
+        gerarAlphaPredios(alphas);
+
+        bool selecionados[patrimonios.size];
+        gerarArraySelecionados(selecionados);
+
+        DrawModelAttribs(&modelo, &lightingShader, "alpha", alphas, "selecionado", selecionados);
 
         //Desenha as linhas
         if(mostrarRaios){
@@ -250,7 +261,7 @@ int main(){
             bBoxShader.setMat4("model", model);
             for(int i = 0; i < patrimonios.size; i++){
                 Patrimonio p = patrimonios.array[i];
-                bBoxShader.setBool("selecionado", patrimonioIndex == p.id);
+                bBoxShader.setBool("selecionado", patrimonioEstaSelecionado(p.id));
                 glBindVertexArray(p.indices.VAO);
                 glDrawElements(GL_LINES, p.indices.numIndices, GL_UNSIGNED_INT, 0);
             }
@@ -285,7 +296,7 @@ int main(){
 
 double algoritmoVisibilidade(IndicesOpenGL* indicesLinhas, bool mostrarTempo){
     double tempoTotal = -1;
-    if(patrimonioIndex >= 0 && tamanhoLinhaGrid > 0 && nPontosPatrimonio > 0 && pontosPatrimonio != nullptr) {
+    if(numPatrimoniosSelecionados >= 0 && tamanhoLinhaGrid > 0 && nPontosPatrimonio > 0 && pontosPatrimonio != nullptr) {
 
         if(passoAlgoritmo == 0){
             tempoInicio = time(nullptr);
@@ -303,8 +314,6 @@ double algoritmoVisibilidade(IndicesOpenGL* indicesLinhas, bool mostrarTempo){
         float metadeQuadrado = tamanhoQuadrado/2.f;
         int numeroQuadradosTotal = numeroQuadradosLinha*numeroQuadradosLinha;
 
-        Patrimonio* patrimonio = getPatrimonio(patrimonioIndex);
-
         if(passoAlgoritmo == 0){
             numPontosVisiveisChao = 0;
             if(pontosVisiveisChao != nullptr){
@@ -313,11 +322,17 @@ double algoritmoVisibilidade(IndicesOpenGL* indicesLinhas, bool mostrarTempo){
             pontosVisiveisChao = (PontoChao*) malloc(sizeof(PontoChao) * numeroQuadradosTotal);
         }
 
+        Patrimonio patrimonios [numPatrimoniosSelecionados];
+        for(unsigned int i = 0; i < numPatrimoniosSelecionados; i++){
+            patrimonios[i] = *getPatrimonio(patrimonioIndex[i]);
+        }
+
         for (unsigned int i = passoAlgoritmo; i < numeroQuadradosTotal; i++) {
 
             //Definindo a posição da pessoa na grid
             int quadradoX = i/numeroQuadradosLinha;
             int quadradoY = i%numeroQuadradosLinha;
+            posPessoaGrid = vec2(float(quadradoX), float(quadradoY));
             posPessoa.x = quadradoX*tamanhoQuadrado - metadeGrid + metadeQuadrado;
             posPessoa.z = quadradoY*tamanhoQuadrado - metadeGrid + metadeQuadrado;
 
@@ -356,7 +371,7 @@ double algoritmoVisibilidade(IndicesOpenGL* indicesLinhas, bool mostrarTempo){
 
 
                     bool acertou = false;
-                    if(isPatrimonioTheClosestHit(patrimonio, &raio)){
+                    if(isPatrimonioTheClosestHit(patrimonios, &raio)){
                         cont++;
                         acertou = true;
                     }
@@ -391,7 +406,7 @@ double algoritmoVisibilidade(IndicesOpenGL* indicesLinhas, bool mostrarTempo){
                 pontosVisiveisChao[numPontosVisiveisChao++] = novoPonto;
 
                 if(porcentagemPredios && porcentagem >= porcentagemMinimaParaPredios){
-                    visibilidadePredios(patrimonio->id, pontoMaiorCont);
+                    visibilidadePredios(pontoMaiorCont);
                 }
             }
 
@@ -438,7 +453,7 @@ double algoritmoVisibilidade(IndicesOpenGL* indicesLinhas, bool mostrarTempo){
     return tempoTotal;
 }
 
-void visibilidadePredios(unsigned int patrimonioId, vec3 ponto){
+void visibilidadePredios(vec3 ponto){
     vec3 up (0.0f, 1.0f, 0.0f);
     vec3 visao = normalize(ponto - posPessoa) * tamanhoRaio;
     vec3 vetorHorizontal = normalize(cross(up, visao));
@@ -459,7 +474,7 @@ void visibilidadePredios(unsigned int patrimonioId, vec3 ponto){
 
         unsigned int idMaisProximo = indexPatrimonioMaisProximo(raio);
 
-        if(idMaisProximo != patrimonioId && idMaisProximo > 0){
+        if(!patrimonioEstaSelecionado(idMaisProximo) && idMaisProximo > 0){
             getPatrimonio(idMaisProximo)->numRaiosAtingidos++;
         }
     }
@@ -487,6 +502,18 @@ void gerarAlphaPredios(float *cores){
             cores[i] = float(patrimonios.array[i].maiorNumRaios)/max;
         }else{
             cores[i] = 0;
+        }
+    }
+}
+
+void gerarArraySelecionados(bool* selecionados){
+    for(unsigned int i = 0; i < patrimonios.size; i++){
+        selecionados[i] = false;
+        for(unsigned int j = 0; j < numPatrimoniosSelecionados; j++){
+            if(patrimonios.array[i].id == patrimonioIndex[j]){
+                selecionados[i] = true;
+                break;
+            }
         }
     }
 }
@@ -639,14 +666,25 @@ void gerarTexturaPontosVisiveis(unsigned int textureID) {
         auto y = (unsigned int) ponto.y;
 
         for (unsigned int j = 0; j < tamanhoQuadrado; j++) {
+            auto hor = y * tamanhoQuadrado + j;
             for (unsigned int k = 0; k < tamanhoQuadrado; k++) {
-                auto hor = y * tamanhoQuadrado + j;
                 auto ver = x * tamanhoQuadrado + k;
                 if (!mostrarGrid || (j != 0 && k != 0 && hor != tamanhoLinha -1 && j != tamanhoLinha - 1)) {
                     auto alpha = (unsigned char) (255 * ponto.porcentagem);
                     data[hor * tamanhoLinha + ver] = (Color) {255, 255, 0, alpha};
                 }
             }
+        }
+    }
+
+    auto x = (unsigned int) posPessoaGrid.x;
+    auto y = (unsigned int) posPessoaGrid.y;
+
+    for (unsigned int i = 0; i < tamanhoQuadrado; i++) {
+        auto hor = y * tamanhoQuadrado + i;
+        for (unsigned int j = 0; j < tamanhoQuadrado; j++) {
+            auto ver = x * tamanhoQuadrado + j;
+            data[hor * tamanhoLinha + ver] = (Color) {255, 127, 80, 255};
         }
     }
 
@@ -912,16 +950,33 @@ Ray getCameraRay(Camera camera){
 }
 
 void setupPatrimonioAlgoritmo(Patrimonio* patrimonio){
-    patrimonioIndex = patrimonio->id;
-    nPontosPatrimonio = patrimonio->mesh.nVertices;
+
+    //Adiciona o novo patrimônio ou patrimonioIndex
+    patrimonioIndex[numPatrimoniosSelecionados] = patrimonio->id;
+    numPatrimoniosSelecionados++;
+
+    auto oldNumPontos = nPontosPatrimonio;
+
+    nPontosPatrimonio += patrimonio->mesh.nVertices;
+
+    auto novoPontosPatrimonio = (Vertice*)malloc(sizeof(Vertice) * nPontosPatrimonio);
+
+    //Copia os pontos antigos pro novo array
+    for(unsigned int i = 0; i < oldNumPontos; i++){
+        novoPontosPatrimonio[i] = pontosPatrimonio[i];
+    }
+
+    //Copia os novos pontos para o novo array
+    for(unsigned int i = 0; i < patrimonio->mesh.nVertices; i++){
+        vec3 v = patrimonio->mesh.vertices[i].Position;
+        novoPontosPatrimonio[oldNumPontos + i] = (Vertice){v.x, v.y, v.z};
+    }
+
     if(pontosPatrimonio != nullptr){
         free(pontosPatrimonio);
     }
-    pontosPatrimonio = (Vertice*)malloc(sizeof(Vertice) * nPontosPatrimonio);
-    for(unsigned int i = 0; i < nPontosPatrimonio; i++){
-        vec3 v = patrimonio->mesh.vertices[i].Position;
-        pontosPatrimonio[i] = (Vertice){v.x, v.y, v.z};
-    }
+
+    pontosPatrimonio = novoPontosPatrimonio;
 }
 
 void selecionarPatrimonio(){
@@ -939,7 +994,37 @@ void selecionarPatrimonio(){
     }
 
     if(menor != nullptr){
-        setupPatrimonioAlgoritmo(menor);
+        if(!patrimonioEstaSelecionado(menor->id)){
+            setupPatrimonioAlgoritmo(menor);
+        }else{
+            //Remover patrimonio
+
+            bool achou = false;
+            unsigned int posID = 0;
+            unsigned int numPontosAnt = 0;
+
+            for(unsigned int i = 0; i < numPatrimoniosSelecionados; i++){
+                if(!achou){
+                    if(patrimonioIndex[i] == menor->id){
+                        achou = true;
+                        posID = i;
+                    }else{
+                        numPontosAnt += getPatrimonio(patrimonioIndex[i])->mesh.nVertices;
+                    }
+                }else{
+                    patrimonioIndex[posID++] = patrimonioIndex[i];
+                }
+            }
+
+            numPatrimoniosSelecionados--;
+
+            if(numPontosAnt > 0){
+                for(unsigned int i = numPontosAnt + menor->mesh.nVertices; i < nPontosPatrimonio; i++){
+                    pontosPatrimonio[numPontosAnt++] = pontosPatrimonio[i];
+                }
+                nPontosPatrimonio -= menor->mesh.nVertices;
+            }
+        }
     }
 }
 
@@ -980,8 +1065,11 @@ void processInput(GLFWwindow *window){
         mostrarRaios = !mostrarRaios;
 
     if(glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS){
+        auto numSelecionadosAntigo = numPatrimoniosSelecionados;
         selecionarPatrimonio();
-        printf("Index: %u\n", patrimonioIndex);
+        if(numPatrimoniosSelecionados > numSelecionadosAntigo){
+            printf("Index: %u\n", patrimonioIndex[numPatrimoniosSelecionados - 1]);
+        }
     }
 
     if(glfwGetKey(window, GLFW_KEY_M) == GLFW_PRESS){
@@ -1039,33 +1127,48 @@ float float_rand( float min, float max ){
     return min + scale * ( max - min );      /* [min, max] */
 }
 
-bool isPatrimonioTheClosestHit(Patrimonio* patrimonio, Ray* raio){
+bool checkRayHitSemArvore(Ray* raio){
+    unsigned int closestId = 0;
+    float closestDistance = raio->length;
+    for(unsigned int i = 0; i < patrimonios.size; i++){
+        auto p = patrimonios.array[i];
+        if(checkCollisionRayBox(raio, &p.bBox)){
+            auto hitInfo = RayHitMesh(raio, &p.mesh);
+            if(hitInfo.hit && hitInfo.distance <= closestDistance){
+                closestId = p.id;
+                closestDistance = hitInfo.distance;
+            }
+        }
+    }
+
+    return patrimonioEstaSelecionado(closestId);
+}
+
+bool isPatrimonioTheClosestHit(Patrimonio* patrimonios, Ray* raio){
 
     switch(tipoArvore){
         case OCTREE:
-            return isPatrimonioTheClosestHit(patrimonio, raio, octree);
+            return isPatrimonioTheClosestHit(patrimonios, numPatrimoniosSelecionados, raio, octree);
 
         case KDTREE:
         case KDTREE_TRI:
-            return isPatrimonioTheClosestHit(patrimonio, raio, kdtree);
+            return isPatrimonioTheClosestHit(patrimonios, numPatrimoniosSelecionados, raio, kdtree);
 
         default:
-            unsigned int closestId = 0;
-            float closestDistance = raio->length;
-            for(unsigned int i = 0; i < patrimonios.size; i++){
-                auto p = patrimonios.array[i];
-                if(checkCollisionRayBox(raio, &p.bBox)){
-                    auto hitInfo = RayHitMesh(raio, &p.mesh);
-                    if(hitInfo.hit && hitInfo.distance <= closestDistance){
-                        closestId = p.id;
-                        closestDistance = hitInfo.distance;
-                    }
-                }
-            }
-
-            return closestId == patrimonio->id;
+            return checkRayHitSemArvore(raio);
     }
 
+}
+
+bool patrimonioEstaSelecionado(unsigned int id){
+
+    for(unsigned int i = 0; i < numPatrimoniosSelecionados; i++){
+        if(patrimonioIndex[i] == id){
+            return true;
+        }
+    }
+
+    return false;
 }
 
 void testarTempoAlgoritmo(){
@@ -1097,20 +1200,23 @@ void testarTempoAlgoritmo(){
 void testarTempoArvores(){
     auto tipoInicial = tipoArvore;
 
-//    tipoArvore = NENHUMA;
-//    printf("Tempo Sem Arvore:\n\n");
-//    testarTempoAlgoritmo();
-//    printf("\n");
-
-    tipoArvore = OCTREE;
-    inicializarArvore();
-    printf("Tempo Octree:\n\n");
-    testarTempoAlgoritmo();
-    printf("\n");
-
 //    tipoArvore = KDTREE;
 //    inicializarArvore();
 //    printf("Tempo KD-Tree:\n\n");
+//    testarTempoAlgoritmo();
+//    printf("\n");
+
+    porcentagemPredios = false;
+    comPorcentagem = false;
+
+    tipoArvore = NENHUMA;
+    printf("Tempo Sem Arvore:\n\n");
+    testarTempoAlgoritmo();
+    printf("\n");
+
+//    tipoArvore = OCTREE;
+//    inicializarArvore();
+//    printf("Tempo Octree:\n\n");
 //    testarTempoAlgoritmo();
 //    printf("\n");
 

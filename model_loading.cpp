@@ -67,10 +67,13 @@ void DrawModel(Model* model, unsigned int shaderID){
     }
 }
 
-void DrawModelAttribs(Model *model, Shader *shader, const char *nomeAtributo, float *valores){
+void DrawModelAttribs(Model* model, Shader* shader, const char* nomeAtributo, float* valores, const char* nomeAtributo2, bool* booleans){
     Mesh *meshes = model->meshes;
     for (unsigned int i = 0; i < model->nMeshes; i++) {
         shader->setFloat(nomeAtributo, valores[i]);
+        if(nomeAtributo2 != nullptr && booleans != nullptr){
+            shader->setBool(nomeAtributo2, booleans[i]);
+        }
         DrawMesh(&meshes[i], shader->ID);
     }
 }

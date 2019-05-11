@@ -124,14 +124,25 @@ Octree* BuildOctree(BoundingBox regiao, std::vector<Patrimonio> patrimonios){
     return octree;
 }
 
-bool isPatrimonioTheClosestHit(Patrimonio* patrimonio, Ray* ray, Octree *octree){
+bool isPatrimonioTheClosestHit(Patrimonio* patrimonios, unsigned int numPatrimonios, Ray* ray, Octree *octree){
 
-    if(octree != nullptr && checkCollisionRayBox(ray, &patrimonio->bBox)){
+    if(octree != nullptr){
+        Patrimonio* maisProximo = nullptr;
+        float distancia = -1;
 
-        RayHitInfo patrimonioHitInfo = RayHitMesh(ray, &patrimonio->mesh);
+        for(unsigned int i = 0; i < numPatrimonios; i++){
+            Patrimonio* patrimonio = &patrimonios[i];
+            if(checkCollisionRayBox(ray, &patrimonio->bBox)){
+                RayHitInfo patrimonioHitInfo = RayHitMesh(ray, &patrimonio->mesh);
+                if(patrimonioHitInfo.hit && patrimonioHitInfo.distance <= ray->length){
+                    maisProximo = patrimonio;
+                    distancia = patrimonioHitInfo.distance;
+                }
+            }
+        }
 
-        if(patrimonioHitInfo.hit && patrimonioHitInfo.distance <= ray->length){
-            return !existeUmPatrimonioMaisProximo(patrimonio->id, patrimonioHitInfo.distance, *ray, octree);
+        if(maisProximo != nullptr){
+            return !existeUmPatrimonioMaisProximo(maisProximo->id, distancia, *ray, octree);
         }
     }
 
@@ -508,15 +519,28 @@ void UnloadKDTree(KDTree* kdtree){
     }
 }
 
-bool isPatrimonioTheClosestHit(Patrimonio* patrimonio, Ray* ray, KDTree* kdtree){
+bool isPatrimonioTheClosestHit(Patrimonio* patrimonios, unsigned int numPatrimonios, Ray* ray, KDTree* kdtree){
 
-    if(kdtree != nullptr && checkCollisionRayBox(ray, &patrimonio->bBox)) {
+    if(kdtree != nullptr){
+        Patrimonio* maisProximo = nullptr;
+        float distancia = -1;
 
-        RayHitInfo patrimonioHitInfo = RayHitMesh(ray, &patrimonio->mesh);
-        if (patrimonioHitInfo.hit && patrimonioHitInfo.distance <= ray->length) {
-            return !existeUmPatrimonioMaisProximo(patrimonio->id, patrimonioHitInfo.distance, *ray, kdtree);
+        for(unsigned int i = 0; i < numPatrimonios; i++){
+            Patrimonio* patrimonio = &patrimonios[i];
+            if(checkCollisionRayBox(ray, &patrimonio->bBox)){
+                RayHitInfo patrimonioHitInfo = RayHitMesh(ray, &patrimonio->mesh);
+                if(patrimonioHitInfo.hit && patrimonioHitInfo.distance <= ray->length){
+                    maisProximo = patrimonio;
+                    distancia = patrimonioHitInfo.distance;
+                }
+            }
+        }
+
+        if(maisProximo != nullptr){
+            return !existeUmPatrimonioMaisProximo(maisProximo->id, distancia, *ray, kdtree);
         }
     }
+
     return false;
 }
 

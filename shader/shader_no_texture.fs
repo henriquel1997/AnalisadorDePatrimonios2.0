@@ -53,7 +53,10 @@ uniform Material material;
 uniform vec3 viewPos;
 
 uniform float alpha;
-uniform vec3 secondColor;
+uniform vec3 alphaColor;
+
+uniform bool selecionado;
+uniform vec3 corSelecionado;
 
 in vec3 Normal;
 in vec3 FragPos;
@@ -69,22 +72,27 @@ vec3 CalcSpotLightSoft(SpotLight light, vec3 normal, vec3 fragPos, vec3 viewDir)
 
 void main()
 {
+    vec3 result = vec3(0.0, 0.0, 0.0);
 
-    // properties
-    vec3 norm = normalize(Normal);
-    vec3 viewDir = normalize(viewPos - FragPos);
+    if(selecionado){
+        result = corSelecionado;
+    }else{
+        // properties
+        vec3 norm = normalize(Normal);
+        vec3 viewDir = normalize(viewPos - FragPos);
 
-    // phase 1: Directional lighting
-    vec3 result = CalcDirLight(dirLight, norm, viewDir);
+        // phase 1: Directional lighting
+        result = CalcDirLight(dirLight, norm, viewDir);
 
-    // phase 2: Point lights
-    //for(int i = 0; i < pointLightNumber; i++)
-        //result += CalcPointLight(pointLights[i], norm, FragPos, viewDir);
+        // phase 2: Point lights
+        //for(int i = 0; i < pointLightNumber; i++)
+            //result += CalcPointLight(pointLights[i], norm, FragPos, viewDir);
 
-    //phase 3: Spot light
-    //result += CalcSpotLightSoft(spotLight, norm, FragPos, viewDir);
+        //phase 3: Spot light
+        //result += CalcSpotLightSoft(spotLight, norm, FragPos, viewDir);
 
-    result = mix(result, secondColor, alpha);
+        result = mix(result, alphaColor, alpha);
+    }
 
     FragColor = vec4(result, 1.0);
 }
