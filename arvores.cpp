@@ -4,8 +4,8 @@
 
 #include "arvores.h"
 
-unsigned int numChecagensOctree = 0;
-unsigned int numChecagensKDTree = 0;
+unsigned long numChecagensOctree = 0;
+unsigned long numChecagensKDTree = 0;
 
 /*--- Octree ---*/
 
@@ -208,7 +208,7 @@ IndexDistance indexDistanceMaisProximo(IndexDistance indexDistance, Ray ray, Oct
     return indexDistance;
 }
 
-unsigned int getNumChecagensOctree(){
+unsigned long getNumChecagensOctree(){
     return numChecagensOctree;
 }
 
@@ -625,6 +625,6 @@ IndexDistance indexDistanceMaisProximo(IndexDistance indexDistance, Ray ray, KDT
     return indexDistance;
 }
 
-unsigned int getNumChecagensKDTree(){
+unsigned long getNumChecagensKDTree(){
     return numChecagensKDTree;
 }

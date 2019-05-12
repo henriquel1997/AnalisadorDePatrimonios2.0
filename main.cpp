@@ -86,7 +86,7 @@ unsigned int passoAlgoritmo = 0;
 float fov = 15.f;
 float tamanhoRaio = 3.0f;
 unsigned int raiosPorPonto = 200;
-bool comPorcentagem = false;
+bool comPorcentagem = true;
 bool porcentagemPredios = false;
 float porcentagemMinimaParaPredios = 0.3f;
 bool executaAlgoritmo = false;
@@ -332,7 +332,7 @@ double algoritmoVisibilidade(IndicesOpenGL* indicesLinhas, bool mostrarTempo){
 
             //Mostrando porcentagem completa da análise
             if(i % (numeroQuadradosTotal/10) == 0){
-                printf("Análise %u %% completa.\n", i/numeroQuadradosTotal);
+                printf("Analise %f%% completa.\n", (float(i)*100)/numeroQuadradosTotal);
             }
 
             //Definindo a posição da pessoa na grid
@@ -437,9 +437,9 @@ double algoritmoVisibilidade(IndicesOpenGL* indicesLinhas, bool mostrarTempo){
                     printf("Tempo algoritmo: %f(s)\n", tempoTotal);
 
                     if(tipoArvore == OCTREE){
-                        printf("Numero de checagens Octree: %i\n", getNumChecagensOctree());
+                        printf("Numero de checagens Octree: %lo\n", getNumChecagensOctree());
                     }else if(tipoArvore == KDTREE){
-                        printf("Numero de checagens KD-Tree: %i\n", getNumChecagensKDTree());
+                        printf("Numero de checagens KD-Tree: %lo\n", getNumChecagensKDTree());
                     }
 
                     if(porcentagemPredios){
@@ -967,34 +967,132 @@ Ray getCameraRay(Camera camera){
     return raio;
 }
 
+void setupPatrimonioAlgoritmoVertices(Patrimonio* patrimonio){
+
+    if(!patrimonioEstaSelecionado(patrimonio->id)){
+        //Adiciona o novo patrimônio ou patrimonioIndex
+        patrimonioIndex[numPatrimoniosSelecionados] = patrimonio->id;
+        numPatrimoniosSelecionados++;
+
+        auto oldNumPontos = nPontosPatrimonio;
+
+        nPontosPatrimonio += patrimonio->mesh.nVertices;
+
+        auto novoPontosPatrimonio = (Vertice*)malloc(sizeof(Vertice) * nPontosPatrimonio);
+
+        //Copia os pontos antigos pro novo array
+        for(unsigned int i = 0; i < oldNumPontos; i++){
+            novoPontosPatrimonio[i] = pontosPatrimonio[i];
+        }
+
+        //Copia os novos pontos para o novo array
+        for(unsigned int i = 0; i < patrimonio->mesh.nVertices; i++){
+            vec3 v = patrimonio->mesh.vertices[i].Position;
+            novoPontosPatrimonio[oldNumPontos + i] = (Vertice){v.x, v.y, v.z};
+        }
+
+        if(pontosPatrimonio != nullptr){
+            free(pontosPatrimonio);
+        }
+
+        pontosPatrimonio = novoPontosPatrimonio;
+    }else{
+        //Remover patrimonio
+
+        bool achou = false;
+        unsigned int posID = 0;
+        unsigned int numPontosAnt = 0;
+
+        for(unsigned int i = 0; i < numPatrimoniosSelecionados; i++){
+            if(!achou){
+                if(patrimonioIndex[i] == patrimonio->id){
+                    achou = true;
+                    posID = i;
+                }else{
+                    numPontosAnt += getPatrimonio(patrimonioIndex[i])->mesh.nVertices;
+                }
+            }else{
+                patrimonioIndex[posID++] = patrimonioIndex[i];
+            }
+        }
+
+        numPatrimoniosSelecionados--;
+
+        if(numPontosAnt > 0){
+            for(unsigned int i = numPontosAnt + patrimonio->mesh.nVertices; i < nPontosPatrimonio; i++){
+                pontosPatrimonio[numPontosAnt++] = pontosPatrimonio[i];
+            }
+            nPontosPatrimonio -= patrimonio->mesh.nVertices;
+        }
+    }
+}
+
 void setupPatrimonioAlgoritmo(Patrimonio* patrimonio){
 
-    //Adiciona o novo patrimônio ou patrimonioIndex
-    patrimonioIndex[numPatrimoniosSelecionados] = patrimonio->id;
-    numPatrimoniosSelecionados++;
+    if(!patrimonioEstaSelecionado(patrimonio->id)){
+        //Adiciona o novo patrimônio ou patrimonioIndex
+        patrimonioIndex[numPatrimoniosSelecionados] = patrimonio->id;
+        numPatrimoniosSelecionados++;
 
-    auto oldNumPontos = nPontosPatrimonio;
+        auto oldNumPontos = nPontosPatrimonio;
 
-    nPontosPatrimonio += patrimonio->mesh.nVertices;
+        nPontosPatrimonio += 9;
 
-    auto novoPontosPatrimonio = (Vertice*)malloc(sizeof(Vertice) * nPontosPatrimonio);
+        auto novoPontosPatrimonio = (Vertice*)malloc(sizeof(Vertice) * nPontosPatrimonio);
 
-    //Copia os pontos antigos pro novo array
-    for(unsigned int i = 0; i < oldNumPontos; i++){
-        novoPontosPatrimonio[i] = pontosPatrimonio[i];
+        //Copia os pontos antigos pro novo array
+        for(unsigned int i = 0; i < oldNumPontos; i++){
+            novoPontosPatrimonio[i] = pontosPatrimonio[i];
+        }
+
+        //Copia os novos pontos para o novo array
+        auto min = patrimonio->bBox.min;
+        auto max = patrimonio->bBox.max;
+        auto centro = (min + max)/2.f;
+
+        novoPontosPatrimonio[oldNumPontos + 0] = (Vertice){centro.x, centro.y, centro.z};
+        novoPontosPatrimonio[oldNumPontos + 1] = (Vertice){min.x, min.y, min.z};
+        novoPontosPatrimonio[oldNumPontos + 2] = (Vertice){max.x, min.y, min.z};
+        novoPontosPatrimonio[oldNumPontos + 3] = (Vertice){min.x, max.y, min.z};
+        novoPontosPatrimonio[oldNumPontos + 4] = (Vertice){min.x, min.y, max.z};
+        novoPontosPatrimonio[oldNumPontos + 5] = (Vertice){max.x, max.y, max.z};
+        novoPontosPatrimonio[oldNumPontos + 6] = (Vertice){min.x, max.y, max.z};
+        novoPontosPatrimonio[oldNumPontos + 7] = (Vertice){max.x, min.y, max.z};
+        novoPontosPatrimonio[oldNumPontos + 8] = (Vertice){max.x, max.y, min.z};
+
+        if(pontosPatrimonio != nullptr){
+            free(pontosPatrimonio);
+        }
+
+        pontosPatrimonio = novoPontosPatrimonio;
+    }else{
+        //Remover patrimonio
+        bool achou = false;
+        unsigned int posID = 0;
+        unsigned int numPontosAnt = 0;
+
+        for(unsigned int i = 0; i < numPatrimoniosSelecionados; i++){
+            if(!achou){
+                if(patrimonioIndex[i] == patrimonio->id){
+                    achou = true;
+                    posID = i;
+                }else{
+                    numPontosAnt += 9;
+                }
+            }else{
+                patrimonioIndex[posID++] = patrimonioIndex[i];
+            }
+        }
+
+        numPatrimoniosSelecionados--;
+
+        if(numPontosAnt > 0){
+            for(unsigned int i = numPontosAnt + 9; i < nPontosPatrimonio; i++){
+                pontosPatrimonio[numPontosAnt++] = pontosPatrimonio[i];
+            }
+            nPontosPatrimonio -= 9;
+        }
     }
-
-    //Copia os novos pontos para o novo array
-    for(unsigned int i = 0; i < patrimonio->mesh.nVertices; i++){
-        vec3 v = patrimonio->mesh.vertices[i].Position;
-        novoPontosPatrimonio[oldNumPontos + i] = (Vertice){v.x, v.y, v.z};
-    }
-
-    if(pontosPatrimonio != nullptr){
-        free(pontosPatrimonio);
-    }
-
-    pontosPatrimonio = novoPontosPatrimonio;
 }
 
 void selecionarPatrimonio(){
@@ -1012,37 +1110,7 @@ void selecionarPatrimonio(){
     }
 
     if(menor != nullptr){
-        if(!patrimonioEstaSelecionado(menor->id)){
-            setupPatrimonioAlgoritmo(menor);
-        }else{
-            //Remover patrimonio
-
-            bool achou = false;
-            unsigned int posID = 0;
-            unsigned int numPontosAnt = 0;
-
-            for(unsigned int i = 0; i < numPatrimoniosSelecionados; i++){
-                if(!achou){
-                    if(patrimonioIndex[i] == menor->id){
-                        achou = true;
-                        posID = i;
-                    }else{
-                        numPontosAnt += getPatrimonio(patrimonioIndex[i])->mesh.nVertices;
-                    }
-                }else{
-                    patrimonioIndex[posID++] = patrimonioIndex[i];
-                }
-            }
-
-            numPatrimoniosSelecionados--;
-
-            if(numPontosAnt > 0){
-                for(unsigned int i = numPontosAnt + menor->mesh.nVertices; i < nPontosPatrimonio; i++){
-                    pontosPatrimonio[numPontosAnt++] = pontosPatrimonio[i];
-                }
-                nPontosPatrimonio -= menor->mesh.nVertices;
-            }
-        }
+        setupPatrimonioAlgoritmo(menor);
     }
 }
 
@@ -1082,7 +1150,10 @@ void processInput(GLFWwindow *window){
     if(glfwGetKey(window, GLFW_KEY_R) == GLFW_PRESS)
         mostrarRaios = !mostrarRaios;
 
-    if(glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS){
+    static bool esquerdoApertado = false;
+
+    if(glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS && !esquerdoApertado){
+        esquerdoApertado = true;
         auto numSelecionadosAntigo = numPatrimoniosSelecionados;
         selecionarPatrimonio();
         printf("Num. Patrimonios Selecionados: %u\n", numPatrimoniosSelecionados);
@@ -1090,6 +1161,10 @@ void processInput(GLFWwindow *window){
         if(numPatrimoniosSelecionados > numSelecionadosAntigo){
             printf("Index: %u\n", patrimonioIndex[numPatrimoniosSelecionados - 1]);
         }
+    }
+
+    if(glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_RELEASE){
+        esquerdoApertado = false;
     }
 
     if(glfwGetKey(window, GLFW_KEY_M) == GLFW_PRESS){
@@ -1110,7 +1185,7 @@ void processInput(GLFWwindow *window){
     }
 
     if(glfwGetKey(window, GLFW_KEY_P) == GLFW_PRESS){
-        printf("Patrimopnios Selecionados: ");
+        printf("Patrimonios Selecionados: ");
         for(unsigned int i = 0; i < numPatrimoniosSelecionados; i++){
             if(i != numPatrimoniosSelecionados - 1){
                 printf("%u,", patrimonioIndex[i]);
@@ -1120,8 +1195,17 @@ void processInput(GLFWwindow *window){
         }
     }
 
-    if(glfwGetKey(window, GLFW_KEY_F) == GLFW_PRESS){
+    static bool fApertado = false;
+
+    if(glfwGetKey(window, GLFW_KEY_F) == GLFW_PRESS && !fApertado){
+        fApertado = true;
         selecionarPatrimoniosFortaleza();
+        printf("Num. Patrimonios Selecionados: %u\n", numPatrimoniosSelecionados);
+        printf("Num. Pontos Patrimonio: %u\n", nPontosPatrimonio);
+    }
+
+    if(glfwGetKey(window, GLFW_KEY_F) == GLFW_RELEASE){
+        fApertado = false;
     }
 }
 

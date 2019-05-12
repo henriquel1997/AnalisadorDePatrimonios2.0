@@ -39,7 +39,7 @@ bool isPatrimonioTheClosestHit(Patrimonio* patrimonios, unsigned int numPatrimon
 bool existeUmPatrimonioMaisProximo(int patrimonioIndex, float patrimonioDistance, Ray ray, Octree *octree);
 unsigned int indexPatrimonioMaisProximo(Ray ray, Octree *octree);
 IndexDistance indexDistanceMaisProximo(IndexDistance indexDistance, Ray ray, Octree *octree);
-unsigned int getNumChecagensOctree();
+unsigned long getNumChecagensOctree();
 
 /*--- KD-Tree ---*/
 
@@ -63,4 +63,4 @@ bool isPatrimonioTheClosestHit(Patrimonio* patrimonios, unsigned int numPatrimon
 bool existeUmPatrimonioMaisProximo(int patrimonioIndex, float patrimonioDistance, Ray ray, KDTree* kdtree);
 unsigned int indexPatrimonioMaisProximo(Ray ray, KDTree *kdtree);
 IndexDistance indexDistanceMaisProximo(IndexDistance indexDistance, Ray ray, KDTree *kdtree);
-unsigned int getNumChecagensKDTree();
+unsigned long getNumChecagensKDTree();
