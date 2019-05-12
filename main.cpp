@@ -89,6 +89,7 @@ unsigned int raiosPorPonto = 200;
 bool comPorcentagem = true;
 bool porcentagemPredios = false;
 float porcentagemMinimaParaPredios = 0.3f;
+float realcePorcentagemChao = 3;
 bool executaAlgoritmo = false;
 bool avancarSolto = false;
 bool avancarAlgoritmo = false; //Passo a passo
@@ -434,20 +435,44 @@ double algoritmoVisibilidade(IndicesOpenGL* indicesLinhas, bool mostrarTempo){
                 executaAlgoritmo = false;
                 tempoTotal = tempoFim - tempoInicio;
                 if(mostrarTempo){
-                    printf("Tempo algoritmo: %f(s)\n", tempoTotal);
+                    //Salva os resultados em um arquivo txt
+                    char nome [60];
+                    snprintf(nome, sizeof(nome), "Analise Patrimonio %lld.txt", (long long)tempoFim);
+
+                    FILE* fp = fopen (nome, "w");
+
+                    fprintf(fp, "Tempo algoritmo: %f(s)\n", tempoTotal);
 
                     if(tipoArvore == OCTREE){
-                        printf("Numero de checagens Octree: %lo\n", getNumChecagensOctree());
+                        fprintf(fp, "Numero de checagens Octree: %lo\n", getNumChecagensOctree());
                     }else if(tipoArvore == KDTREE){
-                        printf("Numero de checagens KD-Tree: %lo\n", getNumChecagensKDTree());
+                        fprintf(fp, "Numero de checagens KD-Tree: %lo\n", getNumChecagensKDTree());
+                    }
+
+                    fprintf(fp, "Indices dos patrimônios analisados: ");
+                    for(unsigned int j = 0; j < numPatrimoniosSelecionados; j++){
+                        if(j != numPatrimoniosSelecionados - 1){
+                            fprintf(fp, "%u, ", patrimonioIndex[j]);
+                        }else{
+                            fprintf(fp, "%u\n", patrimonioIndex[j]);
+                        }
                     }
 
                     if(porcentagemPredios){
-                        printf("Porcentagem prédios:\n");
+                        fprintf(fp, "Porcentagem prédios:\n");
                         for(unsigned int j = 0; j < patrimonios.size; j++){
-                            printf("Prédio %u: %u\n", patrimonios.array[j].id, patrimonios.array[j].maiorNumRaios);
+                            fprintf(fp, "Prédio %u: %u\n", patrimonios.array[j].id, patrimonios.array[j].maiorNumRaios);
                         }
                     }
+
+                    fprintf(fp, "Pontos Chao (%u):\n", numPontosVisiveisChao);
+                    for(unsigned int j = 0; j < numPontosVisiveisChao; j++){
+                        auto ponto = pontosVisiveisChao[j];
+                        fprintf(fp, "{%f, %f, %f}\n", ponto.x, ponto.y, ponto.porcentagem);
+                    }
+
+
+                    fclose (fp);
                 }
             }
 
@@ -683,12 +708,17 @@ void gerarTexturaPontosVisiveis(unsigned int textureID) {
         auto x = (unsigned int) ponto.x;
         auto y = (unsigned int) ponto.y;
 
+        auto alphaMult = 255 * ponto.porcentagem * realcePorcentagemChao;
+        if(alphaMult > 255){
+            alphaMult = 255;
+        }
+        auto alpha = (unsigned char) alphaMult;
+
         for (unsigned int j = 0; j < tamanhoQuadrado; j++) {
             auto hor = y * tamanhoQuadrado + j;
             for (unsigned int k = 0; k < tamanhoQuadrado; k++) {
                 auto ver = x * tamanhoQuadrado + k;
                 if (!mostrarGrid || (j != 0 && k != 0 && hor != tamanhoLinha -1 && j != tamanhoLinha - 1)) {
-                    auto alpha = (unsigned char) (255 * ponto.porcentagem);
                     data[hor * tamanhoLinha + ver] = (Color) {255, 255, 0, alpha};
                 }
             }
@@ -1179,9 +1209,16 @@ void processInput(GLFWwindow *window){
         }
     }
 
-    if(glfwGetKey(window, GLFW_KEY_G) == GLFW_PRESS){
+    static bool botaoGridApertado = false;
+
+    if(glfwGetKey(window, GLFW_KEY_G) == GLFW_PRESS && !botaoGridApertado){
+        botaoGridApertado = true;
         mostrarGrid = !mostrarGrid;
         gerarTexturaPontosVisiveis(gridIndices->texture);
+    }
+
+    if(glfwGetKey(window, GLFW_KEY_G) == GLFW_RELEASE){
+        botaoGridApertado = false;
     }
 
     if(glfwGetKey(window, GLFW_KEY_P) == GLFW_PRESS){
