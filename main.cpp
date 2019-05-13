@@ -43,6 +43,7 @@ void inicializarPatrimonios(Model modelo);
 Patrimonio* getPatrimonio(unsigned int index);
 double algoritmoVisibilidade(IndicesOpenGL* indicesLinhas, bool mostrarTempo = true);
 void salvarResultados(time_t tempoFim, float tempoTotal);
+void carregarResultados(const char* nome);
 void visibilidadePredios(vec3 ponto);
 void inicializarBoundingBoxPatrimonios();
 Ray getCameraRay(Camera camera);
@@ -177,10 +178,12 @@ int main(){
     inicializarBoundingBoxPatrimonios();
 
     //Testes
-    selecionarPatrimoniosFortaleza();
-    testarTodasAsAnalises();
+    //selecionarPatrimoniosFortaleza();
+    //testarTodasAsAnalises();
 
     inicializarArvore();
+
+    carregarResultados("Analise Patrimonio 1557785909.txt");
 
     // render loop
     // -----------
@@ -530,6 +533,104 @@ void salvarResultados(time_t tempoFim, float tempoTotal){
 
 
     fclose (fp);
+}
+
+void carregarResultados(const char* nome){
+    FILE* fp = fopen (nome, "r");
+
+    char line [128];
+    char aux [20];
+
+    while(fgets(line, sizeof(line), fp) != nullptr){
+        strncpy(aux, line, 7);
+        aux[7] = '\0';
+
+        if(strcmp(aux, "Prédio") == 0){
+            strncpy(aux, &line[8], 5);
+
+            for(int i = 0; i < 5; i++){
+                if(aux[i] == ':'){
+                    aux[i] = '\0';
+                    break;
+                }
+            }
+
+            auto id = atoi(aux);
+            if(id > 0){
+                auto cont = atoi(&line[11]);
+                auto patrimonio = getPatrimonio((unsigned int)id);
+                if(cont >= 0){
+                    patrimonio->maiorNumRaios = (unsigned int) cont;
+                }else{
+                    patrimonio->maiorNumRaios = 0;
+                }
+            }
+        }else{
+            strncpy(aux, line, 11);
+            aux[11] = '\0';
+
+            if(strcmp(aux, "Pontos Chao") == 0){
+                strncpy(aux, &line[13], 6);
+
+                for(int i = 0; i < 6; i++){
+                    if(aux[i] == ')'){
+                        aux[i] = '\0';
+                        break;
+                    }
+                }
+
+                auto nPontos = atoi(aux);
+
+                if(nPontos >= 0){
+                    numPontosVisiveisChao = (unsigned int) nPontos;
+
+                    pontosVisiveisChao = (PontoChao*)malloc(sizeof(PontoChao) * numPontosVisiveisChao);
+
+                    unsigned int pos = 0;
+                    while(pos < numPontosVisiveisChao && fgets(line, sizeof(line), fp) != nullptr){
+                        unsigned int inicioProxNum = 1;
+
+                        strncpy(aux, &line[1], 15);
+                        for(unsigned int i = 0; i < 15; i++){
+                            if(aux[i] == ','){
+                                aux[i] = '\0';
+                                inicioProxNum += i + 2;
+                                break;
+                            }
+                        }
+
+                        auto x = (float) atof(aux);
+
+                        strncpy(aux, &line[inicioProxNum], 15);
+                        for(unsigned int i = 0; i < 15; i++){
+                            if(aux[i] == ','){
+                                aux[i] = '\0';
+                                inicioProxNum += i + 2;
+                                break;
+                            }
+                        }
+
+                        auto y = (float) atof(aux);
+
+                        strncpy(aux, &line[inicioProxNum], 15);
+                        for(unsigned int i = 0; i < 15; i++){
+                            if(aux[i] == '}'){
+                                aux[i] = '\0';
+                                break;
+                            }
+                        }
+
+                        auto porcentagem = (float) atof(aux);
+
+                        pontosVisiveisChao[pos++] = (PontoChao) {x, y, porcentagem};
+                    }
+
+                    gerarTexturaPontosVisiveis(gridIndices->texture);
+                }
+            }
+
+        }
+    }
 }
 
 void visibilidadePredios(vec3 ponto){
