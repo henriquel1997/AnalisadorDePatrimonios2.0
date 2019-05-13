@@ -41,7 +41,7 @@ float float_rand( float min, float max);
 bool isPatrimonioTheClosestHit(Patrimonio* patrimonios, Ray* raio);
 void inicializarPatrimonios(Model modelo);
 Patrimonio* getPatrimonio(unsigned int index);
-double algoritmoVisibilidade(IndicesOpenGL* indicesLinhas, bool mostrarTempo = false);
+double algoritmoVisibilidade(IndicesOpenGL* indicesLinhas, bool mostrarTempo = true);
 void salvarResultados(time_t tempoFim, float tempoTotal);
 void visibilidadePredios(vec3 ponto);
 void inicializarBoundingBoxPatrimonios();
@@ -1372,40 +1372,46 @@ void testarTodasAsAnalises(){
     tipoArvore = OCTREE;
     inicializarArvore();
 
-    printf("Tempo Octree Sem Porcentagem Chao, Sem Porcentagem Predios: ");
+    printf("Octree Sem Porcentagem Chao, Sem Porcentagem Predios:\n");
     comPorcentagem = false;
     porcentagemPredios = false;
+    passoAlgoritmo = 0;
     tempo = algoritmoVisibilidade(nullptr);
-    printf("%f\n", tempo);
+    printf("Tempo: %f\n", tempo);
 
-    printf("Tempo Octree Com Porcentagem Chao, Sem Porcentagem Predios: ");
+    printf("Octree Com Porcentagem Chao, Sem Porcentagem Predios:\n");
     comPorcentagem = true;
+    passoAlgoritmo = 0;
     tempo = algoritmoVisibilidade(nullptr);
-    printf("%f\n", tempo);
+    printf("Tempo: %f\n", tempo);
 
-    printf("Tempo Octree Com Porcentagem Chao, Com Porcentagem Predios: ");
+    printf("Octree Com Porcentagem Chao, Com Porcentagem Predios:\n");
     porcentagemPredios = true;
+    passoAlgoritmo = 0;
     tempo = algoritmoVisibilidade(nullptr);
-    printf("%f\n", tempo);
+    printf("Tempo: %f\n", tempo);
 
     tipoArvore = KDTREE;
     inicializarArvore();
 
-    printf("Tempo KD-Tree Sem Porcentagem Chao, Sem Porcentagem Predios: ");
+    printf("KD-Tree Sem Porcentagem Chao, Sem Porcentagem Predios:\n");
     comPorcentagem = false;
     porcentagemPredios = false;
+    passoAlgoritmo = 0;
     tempo = algoritmoVisibilidade(nullptr);
-    printf("%f\n", tempo);
+    printf("Tempo: %f\n", tempo);
 
-    printf("Tempo KD-Tree Com Porcentagem Chao, Sem Porcentagem Predios: ");
+    printf("KD-Tree Com Porcentagem Chao, Sem Porcentagem Predios:\n");
     comPorcentagem = true;
+    passoAlgoritmo = 0;
     tempo = algoritmoVisibilidade(nullptr);
-    printf("%f\n", tempo);
+    printf("Tempo: %f\n", tempo);
 
-    printf("Tempo KD-Tree Com Porcentagem Chao, Com Porcentagem Predios: ");
+    printf("KD-Tree Com Porcentagem Chao, Com Porcentagem Predios:\n");
     porcentagemPredios = true;
+    passoAlgoritmo = 0;
     tempo = algoritmoVisibilidade(nullptr);
-    printf("%f\n", tempo);
+    printf("Tempo: %f\n", tempo);
 }
 
 void selecionarPatrimoniosFortaleza(){
