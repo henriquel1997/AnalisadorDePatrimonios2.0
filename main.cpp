@@ -475,15 +475,15 @@ void salvarResultados(time_t tempoFim, float tempoTotal){
 
     switch (tipoArvore){
         case OCTREE:
-            fprintf(fp, "Tipo Árvore: Octree");
+            fprintf(fp, "Tipo Árvore: Octree\n");
             break;
 
         case KDTREE:
-            fprintf(fp, "Tipo Árvore: KD-Tree");
+            fprintf(fp, "Tipo Árvore: KD-Tree\n");
             break;
 
         default:
-            fprintf(fp, "Tipo Árvore: Nenhuma");
+            fprintf(fp, "Tipo Árvore: Nenhuma\n");
             break;
     }
 
