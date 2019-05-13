@@ -42,6 +42,7 @@ bool isPatrimonioTheClosestHit(Patrimonio* patrimonios, Ray* raio);
 void inicializarPatrimonios(Model modelo);
 Patrimonio* getPatrimonio(unsigned int index);
 double algoritmoVisibilidade(IndicesOpenGL* indicesLinhas, bool mostrarTempo = false);
+void salvarResultados(time_t tempoFim, float tempoTotal);
 void visibilidadePredios(vec3 ponto);
 void inicializarBoundingBoxPatrimonios();
 Ray getCameraRay(Camera camera);
@@ -75,7 +76,7 @@ enum TipoArvore {
     OCTREE, KDTREE, KDTREE_TRI, NENHUMA
 };
 
-TipoArvore tipoArvore = KDTREE;
+TipoArvore tipoArvore = OCTREE;
 Octree* octree = nullptr;
 KDTree* kdtree = nullptr;
 
@@ -438,44 +439,7 @@ double algoritmoVisibilidade(IndicesOpenGL* indicesLinhas, bool mostrarTempo){
                 printf("Analise %f%% completa.\n", 100.f);
 
                 if(mostrarTempo){
-                    //Salva os resultados em um arquivo txt
-                    char nome [60];
-                    snprintf(nome, sizeof(nome), "Analise Patrimonio %lld.txt", (long long)tempoFim);
-
-                    FILE* fp = fopen (nome, "w");
-
-                    fprintf(fp, "Tempo algoritmo: %f(s)\n", tempoTotal);
-
-                    if(tipoArvore == OCTREE){
-                        fprintf(fp, "Numero de checagens Octree: %lo\n", getNumChecagensOctree());
-                    }else if(tipoArvore == KDTREE){
-                        fprintf(fp, "Numero de checagens KD-Tree: %lo\n", getNumChecagensKDTree());
-                    }
-
-                    fprintf(fp, "Indices dos patrimônios analisados: ");
-                    for(unsigned int j = 0; j < numPatrimoniosSelecionados; j++){
-                        if(j != numPatrimoniosSelecionados - 1){
-                            fprintf(fp, "%u, ", patrimonioIndex[j]);
-                        }else{
-                            fprintf(fp, "%u\n", patrimonioIndex[j]);
-                        }
-                    }
-
-                    if(porcentagemPredios){
-                        fprintf(fp, "Porcentagem prédios:\n");
-                        for(unsigned int j = 0; j < patrimonios.size; j++){
-                            fprintf(fp, "Prédio %u: %u\n", patrimonios.array[j].id, patrimonios.array[j].maiorNumRaios);
-                        }
-                    }
-
-                    fprintf(fp, "Pontos Chao (%u):\n", numPontosVisiveisChao);
-                    for(unsigned int j = 0; j < numPontosVisiveisChao; j++){
-                        auto ponto = pontosVisiveisChao[j];
-                        fprintf(fp, "{%f, %f, %f}\n", ponto.x, ponto.y, ponto.porcentagem);
-                    }
-
-
-                    fclose (fp);
+                    salvarResultados(tempoFim, tempoTotal);
                 }
             }
 
@@ -497,6 +461,72 @@ double algoritmoVisibilidade(IndicesOpenGL* indicesLinhas, bool mostrarTempo){
     }
 
     return tempoTotal;
+}
+
+void salvarResultados(time_t tempoFim, float tempoTotal){
+    //Salva os resultados em um arquivo txt
+    char nome [60];
+    snprintf(nome, sizeof(nome), "Analise Patrimonio %lld.txt", (long long)tempoFim);
+
+    FILE* fp = fopen (nome, "w");
+
+    switch (tipoArvore){
+        case OCTREE:
+            fprintf(fp, "Tipo Árvore: Octree");
+            break;
+
+        case KDTREE:
+            fprintf(fp, "Tipo Árvore: KD-Tree");
+            break;
+
+        default:
+            fprintf(fp, "Tipo Árvore: Nenhuma");
+            break;
+    }
+
+    fprintf(fp, "Tempo algoritmo: %f(s)\n", tempoTotal);
+    fprintf(fp, "Tamanho Linha Grid: %f\n", tamanhoLinhaGrid);
+    fprintf(fp, "Tamanho Grid: %u x %u\n", numeroQuadradosLinha, numeroQuadradosLinha);
+    fprintf(fp, "FOV: %f\n", fov);
+    fprintf(fp, "Tamanho Raio: %f\n", tamanhoRaio);
+    fprintf(fp, "Raios Por Ponto: %u\n", raiosPorPonto);
+    fprintf(fp, "Porcentagem Chão: %s\n", comPorcentagem ? "true" : "false");
+    fprintf(fp, "Porcentagem Prédios: %s\n", porcentagemPredios ? "true" : "false");
+    if(porcentagemPredios){
+        fprintf(fp, "Porcentagem Mínima Prédios: %f\n", porcentagemMinimaParaPredios);
+    }
+    fprintf(fp, "Animado: %s\n", animado ? "true" : "false");
+
+    if(tipoArvore == OCTREE){
+        fprintf(fp, "Numero de checagens Octree: %lo\n", getNumChecagensOctree());
+    }else if(tipoArvore == KDTREE){
+        fprintf(fp, "Numero de checagens KD-Tree: %lo\n", getNumChecagensKDTree());
+    }
+
+    fprintf(fp, "Indices dos patrimônios analisados: ");
+    for(unsigned int j = 0; j < numPatrimoniosSelecionados; j++){
+        if(j != numPatrimoniosSelecionados - 1){
+            fprintf(fp, "%u, ", patrimonioIndex[j]);
+        }else{
+            fprintf(fp, "%u\n", patrimonioIndex[j]);
+        }
+    }
+
+    if(porcentagemPredios){
+        fprintf(fp, "Porcentagem prédios:\n");
+        for(unsigned int j = 0; j < patrimonios.size; j++){
+            fprintf(fp, "Prédio %u: %u\n", patrimonios.array[j].id, patrimonios.array[j].maiorNumRaios);
+        }
+    }
+
+    fprintf(fp, "Pontos Chao (%u):\n", numPontosVisiveisChao);
+    for(unsigned int j = 0; j < numPontosVisiveisChao; j++){
+        auto ponto = pontosVisiveisChao[j];
+        fprintf(fp, "{%f, %f, %f}\n", ponto.x, ponto.y, ponto.porcentagem);
+    }
+
+
+    fclose (fp);
 }
 
 void visibilidadePredios(vec3 ponto){
