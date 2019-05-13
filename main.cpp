@@ -53,6 +53,7 @@ void gerarAlphaPredios(float *cores);
 void gerarArraySelecionados(bool* selecionados);
 void testarTempoAlgoritmo();
 void testarTempoArvores();
+void testarTodasAsAnalises();
 void setupPatrimonioAlgoritmo(Patrimonio* patrimonio);
 bool salvarScreenshot(unsigned int inicioX = 0, unsigned int inicioY = 0, unsigned int width = SCR_WIDTH, unsigned int height = SCR_HEIGHT);
 void salvarMapa();
@@ -175,7 +176,9 @@ int main(){
     inicializarPatrimonios(modelo);
     inicializarBoundingBoxPatrimonios();
 
-    //testarTempoArvores();
+    //Testes
+    selecionarPatrimoniosFortaleza();
+    testarTodasAsAnalises();
 
     inicializarArvore();
 
@@ -1360,56 +1363,49 @@ bool patrimonioEstaSelecionado(unsigned int id){
     return false;
 }
 
-void testarTempoAlgoritmo(){
-    bool flagAnimadoAntigo = animado;
+
+void testarTodasAsAnalises(){
     animado = false;
 
-    unsigned int pulo = patrimonios.size / 22;
+    double tempo = 0;
 
-    double tempos[patrimonios.size];
-    for(unsigned int i = 0; i < patrimonios.size; i += pulo){
-        printf("Tempo Patrimonio %i: ", i);
-        setupPatrimonioAlgoritmo(&patrimonios.array[i]);
-        passoAlgoritmo = 0;
-        auto tempo = algoritmoVisibilidade(nullptr);
-        tempos[i] = tempo;
-        printf("%f\n", tempo);
-    }
+    tipoArvore = OCTREE;
+    inicializarArvore();
 
-    double media = 0;
-    for(unsigned int i = 0; i < patrimonios.size; i++){
-        media += tempos[i];
-    }
-    media /= patrimonios.size;
-    printf("Tempo medio: %f\n", media);
-
-    animado = flagAnimadoAntigo;
-}
-
-void testarTempoArvores(){
-    auto tipoInicial = tipoArvore;
-
-//    tipoArvore = KDTREE;
-//    inicializarArvore();
-//    printf("Tempo KD-Tree:\n\n");
-//    testarTempoAlgoritmo();
-//    printf("\n");
-
-    porcentagemPredios = false;
+    printf("Tempo Octree Sem Porcentagem Chao, Sem Porcentagem Predios: ");
     comPorcentagem = false;
+    porcentagemPredios = false;
+    tempo = algoritmoVisibilidade(nullptr);
+    printf("%f\n", tempo);
 
-    tipoArvore = NENHUMA;
-    printf("Tempo Sem Arvore:\n\n");
-    testarTempoAlgoritmo();
-    printf("\n");
+    printf("Tempo Octree Com Porcentagem Chao, Sem Porcentagem Predios: ");
+    comPorcentagem = true;
+    tempo = algoritmoVisibilidade(nullptr);
+    printf("%f\n", tempo);
 
-//    tipoArvore = OCTREE;
-//    inicializarArvore();
-//    printf("Tempo Octree:\n\n");
-//    testarTempoAlgoritmo();
-//    printf("\n");
+    printf("Tempo Octree Com Porcentagem Chao, Com Porcentagem Predios: ");
+    porcentagemPredios = true;
+    tempo = algoritmoVisibilidade(nullptr);
+    printf("%f\n", tempo);
 
-    tipoArvore = tipoInicial;
+    tipoArvore = KDTREE;
+    inicializarArvore();
+
+    printf("Tempo KD-Tree Sem Porcentagem Chao, Sem Porcentagem Predios: ");
+    comPorcentagem = false;
+    porcentagemPredios = false;
+    tempo = algoritmoVisibilidade(nullptr);
+    printf("%f\n", tempo);
+
+    printf("Tempo KD-Tree Com Porcentagem Chao, Sem Porcentagem Predios: ");
+    comPorcentagem = true;
+    tempo = algoritmoVisibilidade(nullptr);
+    printf("%f\n", tempo);
+
+    printf("Tempo KD-Tree Com Porcentagem Chao, Com Porcentagem Predios: ");
+    porcentagemPredios = true;
+    tempo = algoritmoVisibilidade(nullptr);
+    printf("%f\n", tempo);
 }
 
 void selecionarPatrimoniosFortaleza(){
