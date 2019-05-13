@@ -75,7 +75,7 @@ enum TipoArvore {
     OCTREE, KDTREE, KDTREE_TRI, NENHUMA
 };
 
-TipoArvore tipoArvore = OCTREE;
+TipoArvore tipoArvore = KDTREE;
 Octree* octree = nullptr;
 KDTree* kdtree = nullptr;
 
@@ -86,7 +86,7 @@ unsigned int passoAlgoritmo = 0;
 float fov = 15.f;
 float tamanhoRaio = 3.0f;
 unsigned int raiosPorPonto = 200;
-bool comPorcentagem = true;
+bool comPorcentagem = false;
 bool porcentagemPredios = false;
 float porcentagemMinimaParaPredios = 0.3f;
 float realcePorcentagemChao = 3;
@@ -434,6 +434,9 @@ double algoritmoVisibilidade(IndicesOpenGL* indicesLinhas, bool mostrarTempo){
                 avancarAlgoritmo = false;
                 executaAlgoritmo = false;
                 tempoTotal = tempoFim - tempoInicio;
+
+                printf("Analise %f%% completa.\n", 100.f);
+
                 if(mostrarTempo){
                     //Salva os resultados em um arquivo txt
                     char nome [60];

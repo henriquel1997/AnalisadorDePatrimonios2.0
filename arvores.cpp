@@ -137,7 +137,7 @@ bool isPatrimonioTheClosestHit(Patrimonio* patrimonios, unsigned int numPatrimon
             Patrimonio* patrimonio = &patrimonios[i];
             if(checkCollisionRayBox(ray, &patrimonio->bBox)){
                 RayHitInfo patrimonioHitInfo = RayHitMesh(ray, &patrimonio->mesh);
-                if(patrimonioHitInfo.hit && patrimonioHitInfo.distance <= ray->length){
+                if(patrimonioHitInfo.hit && patrimonioHitInfo.distance <= ray->length && (distancia == -1 || patrimonioHitInfo.distance < distancia)){
                     maisProximo = patrimonio;
                     distancia = patrimonioHitInfo.distance;
                 }
@@ -241,15 +241,17 @@ KDTree* BuildKDTree(int nivel, int nivelMax, BoundingBox regiao, std::vector<Pat
         //É um nó folha
         kdtree->regiao = regiao;
         kdtree->patrimonio = (Patrimonio*)malloc(sizeof(Patrimonio));
+        kdtree->numPatrimonios = 1;
         *kdtree->patrimonio = patrimonios[0];
         kdtree->triangulo = nullptr;
         kdtree->menor = nullptr;
         kdtree->maior = nullptr;
 
     } else if(nivelMax >= 0 && nivel >= nivelMax) {
-        //Se o nivelMax for negativo, não tem limite de nivel
+        //Se o nivelMax for negativo, não tem limite de nivel, logo nesse caso não vai entrar aqui
         //É um nó folha com mais de um patrimônio
         kdtree->regiao = regiao;
+        kdtree->numPatrimonios = (unsigned int) patrimonios.size();
         kdtree->patrimonio = (Patrimonio*)malloc(sizeof(Patrimonio) * patrimonios.size());
 
         for(unsigned int i = 0; i < patrimonios.size(); i++){
@@ -269,18 +271,18 @@ KDTree* BuildKDTree(int nivel, int nivelMax, BoundingBox regiao, std::vector<Pat
         for (int i = 0; i < nPatrimonios; i++) {
             BoundingBox bBox = patrimonios[i].bBox;
             centros[i] = (bBox.min + bBox.max)/2.f;
-            media = media + centros[i];
+            media += centros[i];
         }
 
-        media = media / float(nPatrimonios);
+        media /= float(nPatrimonios);
 
-        //Calcula a variância dos centros
+        //Calcula a variância populacional dos centros
         vec3 variancia = {0.f, 0.f, 0.f};
         for (auto &centro : centros) {
             vec3 sub = centro - media;
-            variancia = variancia + (sub * sub);
+            variancia += (sub * sub);
         }
-        variancia = variancia / float(nPatrimonios-1);
+        variancia = variancia / float(nPatrimonios);
 
         //Define o eixo de divisão
         Eixo eixo = X;
@@ -297,28 +299,32 @@ KDTree* BuildKDTree(int nivel, int nivelMax, BoundingBox regiao, std::vector<Pat
         std::vector<Patrimonio> patrimoniosMenor;
         std::vector<Patrimonio> patrimoniosMaior;
         for(int i = 0; i < nPatrimonios; i++){
+
+            auto min = patrimonios[i].bBox.min;
+            auto max = patrimonios[i].bBox.max;
+
             switch(eixo){
                 case X:
-                    if(centros[i].x <= valorEixo){
+                    if(centros[i].x <= valorEixo || min.x <= valorEixo || max.x <= valorEixo){
                         patrimoniosMenor.push_back(patrimonios[i]);
                     }
-                    if(centros[i].x >= valorEixo){
+                    if(centros[i].x >= valorEixo || min.x >= valorEixo || max.x >= valorEixo){
                         patrimoniosMaior.push_back(patrimonios[i]);
                     }
                     break;
                 case Y:
-                    if(centros[i].y <= valorEixo){
+                    if(centros[i].y <= valorEixo || min.y <= valorEixo || max.y <= valorEixo){
                         patrimoniosMenor.push_back(patrimonios[i]);
                     }
-                    if(centros[i].y >= valorEixo){
+                    if(centros[i].y >= valorEixo || min.y >= valorEixo || max.y >= valorEixo){
                         patrimoniosMaior.push_back(patrimonios[i]);
                     }
                     break;
                 case Z:
-                    if(centros[i].z <= valorEixo){
+                    if(centros[i].z <= valorEixo || min.z <= valorEixo || max.z <= valorEixo){
                         patrimoniosMenor.push_back(patrimonios[i]);
                     }
-                    if(centros[i].z >= valorEixo){
+                    if(centros[i].z >= valorEixo || min.z >= valorEixo || max.z >= valorEixo){
                         patrimoniosMaior.push_back(patrimonios[i]);
                     }
                     break;
@@ -346,6 +352,7 @@ KDTree* BuildKDTree(int nivel, int nivelMax, BoundingBox regiao, std::vector<Pat
         }
         kdtree->menor = BuildKDTree(nivel + 1, nivelMax, regiaoMenor, patrimoniosMenor);
         kdtree->maior = BuildKDTree(nivel + 1, nivelMax, regiaoMaior, patrimoniosMaior);
+        kdtree->numPatrimonios = 0;
         kdtree->patrimonio = nullptr;
         kdtree->triangulo = nullptr;
     }
@@ -537,7 +544,7 @@ bool isPatrimonioTheClosestHit(Patrimonio* patrimonios, unsigned int numPatrimon
             Patrimonio* patrimonio = &patrimonios[i];
             if(checkCollisionRayBox(ray, &patrimonio->bBox)){
                 RayHitInfo patrimonioHitInfo = RayHitMesh(ray, &patrimonio->mesh);
-                if(patrimonioHitInfo.hit && patrimonioHitInfo.distance <= ray->length){
+                if(patrimonioHitInfo.hit && patrimonioHitInfo.distance <= ray->length && (distancia == -1 || patrimonioHitInfo.distance < distancia)){
                     maisProximo = patrimonio;
                     distancia = patrimonioHitInfo.distance;
                 }
@@ -555,20 +562,12 @@ bool isPatrimonioTheClosestHit(Patrimonio* patrimonios, unsigned int numPatrimon
 bool existeUmPatrimonioMaisProximo(int patrimonioIndex, float patrimonioDistance, Ray ray, KDTree* kdtree){
     if(kdtree != nullptr && checkCollisionRayBox(&ray, &kdtree->regiao)){
 
-        numChecagensKDTree++;
-
-        Triangulo* triangulo = kdtree->triangulo;
-        Patrimonio* patrimonio = kdtree->patrimonio;
-        if(triangulo != nullptr && triangulo->patrimonio->id != patrimonioIndex){
-            //Se tiver um triângulo, é um nó folha
-            auto hitInfo = RayHitTriangle(&ray, triangulo);
-            if(hitInfo.hit && hitInfo.distance < patrimonioDistance){
-                return true;
-            }
-        }else if(patrimonio != nullptr && patrimonio->id != patrimonioIndex){
-            //Se tiver um patrimônio, é um nó folha
-            if(checkCollisionRayBox(&ray, &patrimonio->bBox)){
-                auto hitInfo = RayHitMesh(&ray, &patrimonio->mesh);
+        //TODO: Check de interseção com os triângulos ainda não implementado, pois eles ainda não fazem o limite de nível
+        for(unsigned int i = 0; i < kdtree->numPatrimonios; i++){
+            numChecagensKDTree++;
+            Patrimonio patrimonio = kdtree->patrimonio[i];
+            if(checkCollisionRayBox(&ray, &patrimonio.bBox)){
+                auto hitInfo = RayHitMesh(&ray, &patrimonio.mesh);
                 if(hitInfo.hit && hitInfo.distance < patrimonioDistance){
                     return true;
                 }
@@ -592,20 +591,13 @@ unsigned int indexPatrimonioMaisProximo(Ray ray, KDTree *kdtree){
 IndexDistance indexDistanceMaisProximo(IndexDistance indexDistance, Ray ray, KDTree *kdtree){
     if(kdtree != nullptr && checkCollisionRayBox(&ray, &kdtree->regiao)){
 
-        Triangulo* triangulo = kdtree->triangulo;
-        Patrimonio* patrimonio = kdtree->patrimonio;
-        if(triangulo != nullptr && triangulo->patrimonio->id != indexDistance.index){
-            //Se tiver um triângulo, é um nó folha
-            auto hitInfo = RayHitTriangle(&ray, triangulo);
-            if(hitInfo.hit && hitInfo.distance < indexDistance.distance){
-                indexDistance = (IndexDistance){triangulo->patrimonio->id, hitInfo.distance};
-            }
-        }else if(patrimonio != nullptr && patrimonio->id != indexDistance.index){
-            //Se tiver um patrimônio, é um nó folha
-            if(checkCollisionRayBox(&ray, &patrimonio->bBox)){
-                auto hitInfo = RayHitMesh(&ray, &patrimonio->mesh);
+        //TODO: Index distance com os triângulos ainda não implementado, pois eles ainda não fazem o limite de nível
+        for(unsigned int i = 0; i < kdtree->numPatrimonios; i++){
+            Patrimonio patrimonio = kdtree->patrimonio[i];
+            if(checkCollisionRayBox(&ray, &patrimonio.bBox)){
+                auto hitInfo = RayHitMesh(&ray, &patrimonio.mesh);
                 if(hitInfo.hit && hitInfo.distance < indexDistance.distance){
-                    indexDistance = (IndexDistance){patrimonio->id, hitInfo.distance};
+                    indexDistance = (IndexDistance){patrimonio.id, hitInfo.distance};
                 }
             }
         }

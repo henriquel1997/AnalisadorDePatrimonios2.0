@@ -49,6 +49,7 @@ struct KDTree{
     BoundingBox regiao;
     Eixo eixo;
     float valorEixo;
+    unsigned int numPatrimonios;
     Patrimonio* patrimonio;
     Triangulo* triangulo;
 };
