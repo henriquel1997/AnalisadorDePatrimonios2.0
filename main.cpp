@@ -42,7 +42,7 @@ bool isPatrimonioTheClosestHit(Patrimonio* patrimonios, Ray* raio);
 void inicializarPatrimonios(Model modelo);
 Patrimonio* getPatrimonio(unsigned int index);
 double algoritmoVisibilidade(IndicesOpenGL* indicesLinhas, bool mostrarTempo = true);
-void salvarResultados(time_t tempoFim, float tempoTotal);
+void salvarResultados(time_t tempoFim, double tempoTotal);
 void carregarResultados(const char* nome);
 void visibilidadePredios(vec3 ponto);
 void inicializarBoundingBoxPatrimonios();
@@ -71,7 +71,7 @@ bool firstMouse = true;
 float deltaTime = 0.0f;
 float lastFrame = 0.0f;
 
-vec3 posPessoa(0.f, .1f, 0.f);
+vec3 posPessoa(0.f, .005f, 0.f); // Altura centro.obj: 0.1f / fortaleza.obj (escala 0.005f): .005f
 vec2 posPessoaGrid(0.f, 0.f);
 
 enum TipoArvore {
@@ -98,8 +98,8 @@ bool avancarSolto = false;
 bool avancarAlgoritmo = false; //Passo a passo
 bool animado = false;
 bool mostrarRaios = false;
-bool mostrarBoundingBox = true;
-bool mostrarGrid = true;
+bool mostrarBoundingBox = false;
+bool mostrarGrid = false;
 time_t tempoInicio;
 
 Lista<Patrimonio> patrimonios;
@@ -178,12 +178,12 @@ int main(){
     inicializarBoundingBoxPatrimonios();
 
     //Testes
-    //selecionarPatrimoniosFortaleza();
-    //testarTodasAsAnalises();
+    selecionarPatrimoniosFortaleza();
+    testarTodasAsAnalises();
 
     inicializarArvore();
 
-    carregarResultados("Analise Patrimonio 1557785909.txt");
+    //carregarResultados("Analise Patrimonio 1557785909.txt");
 
     // render loop
     // -----------
@@ -469,7 +469,7 @@ double algoritmoVisibilidade(IndicesOpenGL* indicesLinhas, bool mostrarTempo){
     return tempoTotal;
 }
 
-void salvarResultados(time_t tempoFim, float tempoTotal){
+void salvarResultados(time_t tempoFim, double tempoTotal){
     //Salva os resultados em um arquivo txt
     char nome [60];
     snprintf(nome, sizeof(nome), "Analise Patrimonio %lld.txt", (long long)tempoFim);
@@ -490,6 +490,8 @@ void salvarResultados(time_t tempoFim, float tempoTotal){
             break;
     }
 
+    fprintf(fp, "Tempo inicio: %lli\n", tempoInicio);
+    fprintf(fp, "Tempo fim: %lli\n", tempoFim);
     fprintf(fp, "Tempo algoritmo: %f(s)\n", tempoTotal);
     fprintf(fp, "Tamanho Linha Grid: %f\n", tamanhoLinhaGrid);
     fprintf(fp, "Tamanho Grid: %u x %u\n", numeroQuadradosLinha, numeroQuadradosLinha);
@@ -1482,11 +1484,13 @@ void testarTodasAsAnalises(){
 
     printf("Octree Com Porcentagem Chao, Sem Porcentagem Predios:\n");
     comPorcentagem = true;
+    porcentagemPredios = false;
     passoAlgoritmo = 0;
     tempo = algoritmoVisibilidade(nullptr);
     printf("Tempo: %f\n", tempo);
 
     printf("Octree Com Porcentagem Chao, Com Porcentagem Predios:\n");
+    comPorcentagem = true;
     porcentagemPredios = true;
     passoAlgoritmo = 0;
     tempo = algoritmoVisibilidade(nullptr);
@@ -1504,11 +1508,13 @@ void testarTodasAsAnalises(){
 
     printf("KD-Tree Com Porcentagem Chao, Sem Porcentagem Predios:\n");
     comPorcentagem = true;
+    porcentagemPredios = false;
     passoAlgoritmo = 0;
     tempo = algoritmoVisibilidade(nullptr);
     printf("Tempo: %f\n", tempo);
 
     printf("KD-Tree Com Porcentagem Chao, Com Porcentagem Predios:\n");
+    comPorcentagem = true;
     porcentagemPredios = true;
     passoAlgoritmo = 0;
     tempo = algoritmoVisibilidade(nullptr);
