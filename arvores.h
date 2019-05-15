@@ -54,7 +54,7 @@ struct KDTree{
     Triangulo* triangulo;
 };
 
-KDTree* BuildKDTree(BoundingBox regiao, Patrimonio* patrimonios, unsigned int nPatrimonios);
+KDTree* BuildKDTree(BoundingBox regiao, int nivelMax, Patrimonio* patrimonios, unsigned int nPatrimonios);
 KDTree* BuildKDTree(int nivel, int nivelMax, BoundingBox regiao, std::vector<Patrimonio> patrimonios);
 KDTree* BuildKDTreeTriangulos(BoundingBox regiao, Patrimonio* patrimonios, unsigned int nPatrimonios);
 KDTree* BuildKDTreeTriangulos(BoundingBox regiao, std::vector<Patrimonio> patrimonios);

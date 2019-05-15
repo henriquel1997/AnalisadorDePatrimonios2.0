@@ -214,7 +214,7 @@ unsigned long getNumChecagensOctree(){
 
 /*--- KD-Tree ---*/
 
-KDTree* BuildKDTree(BoundingBox regiao, Patrimonio* patrimonios, unsigned int nPatrimonios){
+KDTree* BuildKDTree(BoundingBox regiao, int nivelMax, Patrimonio* patrimonios, unsigned int nPatrimonios){
 
     std::vector<Patrimonio> vetor;
     for(unsigned int i = 0; i < nPatrimonios; i++){
@@ -224,8 +224,7 @@ KDTree* BuildKDTree(BoundingBox regiao, Patrimonio* patrimonios, unsigned int nP
         }
     }
 
-    //TODO: Não deixar o nivel máximo hardcoded
-    return BuildKDTree(0, 15, regiao, vetor);
+    return BuildKDTree(0, nivelMax, regiao, vetor);
 }
 
 KDTree* BuildKDTree(int nivel, int nivelMax, BoundingBox regiao, std::vector<Patrimonio> patrimonios){
@@ -566,7 +565,7 @@ bool existeUmPatrimonioMaisProximo(int patrimonioIndex, float patrimonioDistance
         for(unsigned int i = 0; i < kdtree->numPatrimonios; i++){
             numChecagensKDTree++;
             Patrimonio patrimonio = kdtree->patrimonio[i];
-            if(checkCollisionRayBox(&ray, &patrimonio.bBox)){
+            if(patrimonio.id != patrimonioIndex && checkCollisionRayBox(&ray, &patrimonio.bBox)){
                 auto hitInfo = RayHitMesh(&ray, &patrimonio.mesh);
                 if(hitInfo.hit && hitInfo.distance < patrimonioDistance){
                     return true;
