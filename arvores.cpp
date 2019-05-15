@@ -4,8 +4,10 @@
 
 #include "arvores.h"
 
-unsigned long numChecagensOctree = 0;
-unsigned long numChecagensKDTree = 0;
+unsigned long long numChecagensOctree = 0;
+unsigned long long numChecagensKDTree = 0;
+unsigned long long numOverflowOctree = 0;
+unsigned long long numOverFlowKDTree = 0;
 
 /*--- Octree ---*/
 
@@ -157,6 +159,10 @@ bool existeUmPatrimonioMaisProximo(int patrimonioIndex, float patrimonioDistance
     if(checkCollisionRayBox(&ray, &octree->regiao)){
         for(int i = 0; i < octree->numeroPatrimonios; i++){
             numChecagensOctree++;
+            if(numChecagensOctree == 0){
+                numOverflowOctree++;
+                printf("Overflow Octree\n");
+            }
             Patrimonio patrimonio = octree->patrimonios[i];
             if(patrimonio.id != patrimonioIndex && checkCollisionRayBox(&ray, &patrimonio.bBox)){
                 RayHitInfo newHitInfo = RayHitMesh(&ray, &patrimonio.mesh);
@@ -208,8 +214,20 @@ IndexDistance indexDistanceMaisProximo(IndexDistance indexDistance, Ray ray, Oct
     return indexDistance;
 }
 
-unsigned long getNumChecagensOctree(){
+unsigned long long getNumChecagensOctree(){
     return numChecagensOctree;
+}
+
+unsigned long long getNumOverflowOctree(){
+    return numOverflowOctree;
+}
+
+void resetContadores(){
+    printf("Resetando os contadores\n");
+    numOverflowOctree = 0;
+    numOverFlowKDTree = 0;
+    numChecagensOctree = 0;
+    numChecagensKDTree = 0;
 }
 
 /*--- KD-Tree ---*/
@@ -564,6 +582,10 @@ bool existeUmPatrimonioMaisProximo(int patrimonioIndex, float patrimonioDistance
         //TODO: Check de interseção com os triângulos ainda não implementado, pois eles ainda não fazem o limite de nível
         for(unsigned int i = 0; i < kdtree->numPatrimonios; i++){
             numChecagensKDTree++;
+            if(numChecagensKDTree == 0){
+                numOverFlowKDTree++;
+                printf("Overflow KD-Tree\n");
+            }
             Patrimonio patrimonio = kdtree->patrimonio[i];
             if(patrimonio.id != patrimonioIndex && checkCollisionRayBox(&ray, &patrimonio.bBox)){
                 auto hitInfo = RayHitMesh(&ray, &patrimonio.mesh);
@@ -616,6 +638,10 @@ IndexDistance indexDistanceMaisProximo(IndexDistance indexDistance, Ray ray, KDT
     return indexDistance;
 }
 
-unsigned long getNumChecagensKDTree(){
+unsigned long long getNumChecagensKDTree(){
     return numChecagensKDTree;
+}
+
+unsigned long long getNumOverflowKDTree(){
+    return numOverFlowKDTree;
 }

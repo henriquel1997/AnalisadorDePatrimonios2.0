@@ -78,7 +78,7 @@ enum TipoArvore {
     OCTREE, KDTREE, KDTREE_TRI, NENHUMA
 };
 
-TipoArvore tipoArvore = KDTREE;
+TipoArvore tipoArvore = OCTREE;
 Octree* octree = nullptr;
 KDTree* kdtree = nullptr;
 int nivelMaxKDTree = 3;
@@ -184,7 +184,7 @@ int main(){
 
     inicializarArvore();
 
-    //carregarResultados("Analise Patrimonio 1557883719.txt");
+    //carregarResultados("Analise Patrimonio 1557928055.txt");
 
     // render loop
     // -----------
@@ -310,6 +310,8 @@ double algoritmoVisibilidade(IndicesOpenGL* indicesLinhas, bool mostrarTempo){
 
         if(passoAlgoritmo == 0){
             tempoInicio = time(nullptr);
+
+            resetContadores();
 
             if(porcentagemPredios){
                 for(unsigned int i = 0; i < patrimonios.size; i++){
@@ -508,9 +510,11 @@ void salvarResultados(time_t tempoFim, double tempoTotal){
     fprintf(fp, "Animado: %s\n", animado ? "true" : "false");
 
     if(tipoArvore == OCTREE){
-        fprintf(fp, "Numero de checagens Octree: %lo\n", getNumChecagensOctree());
+        fprintf(fp, "Numero de checagens Octree: %lli\n", getNumChecagensOctree());
+        fprintf(fp, "Numero de overflow Octree: %lli\n", getNumOverflowOctree());
     }else if(tipoArvore == KDTREE){
-        fprintf(fp, "Numero de checagens KD-Tree: %lo\n", getNumChecagensKDTree());
+        fprintf(fp, "Numero de checagens KD-Tree: %lli\n", getNumChecagensKDTree());
+        fprintf(fp, "Numero de overflow KD-Tree: %lli\n", getNumOverflowKDTree());
     }
 
     fprintf(fp, "Indices dos patrimônios analisados: ");
@@ -1474,29 +1478,29 @@ void testarTodasAsAnalises(){
 
     double tempo = 0;
 
-//    tipoArvore = OCTREE;
-//    inicializarArvore();
-//
-//    printf("Octree Sem Porcentagem Chao, Sem Porcentagem Predios:\n");
-//    comPorcentagem = false;
-//    porcentagemPredios = false;
-//    passoAlgoritmo = 0;
-//    tempo = algoritmoVisibilidade(nullptr);
-//    printf("Tempo: %f\n", tempo);
-//
-//    printf("Octree Com Porcentagem Chao, Sem Porcentagem Predios:\n");
-//    comPorcentagem = true;
-//    porcentagemPredios = false;
-//    passoAlgoritmo = 0;
-//    tempo = algoritmoVisibilidade(nullptr);
-//    printf("Tempo: %f\n", tempo);
-//
-//    printf("Octree Com Porcentagem Chao, Com Porcentagem Predios:\n");
-//    comPorcentagem = true;
-//    porcentagemPredios = true;
-//    passoAlgoritmo = 0;
-//    tempo = algoritmoVisibilidade(nullptr);
-//    printf("Tempo: %f\n", tempo);
+    tipoArvore = OCTREE;
+    inicializarArvore();
+
+    printf("Octree Sem Porcentagem Chao, Sem Porcentagem Predios:\n");
+    comPorcentagem = false;
+    porcentagemPredios = false;
+    passoAlgoritmo = 0;
+    tempo = algoritmoVisibilidade(nullptr);
+    printf("Tempo: %f\n", tempo);
+
+    printf("Octree Com Porcentagem Chao, Sem Porcentagem Predios:\n");
+    comPorcentagem = true;
+    porcentagemPredios = false;
+    passoAlgoritmo = 0;
+    tempo = algoritmoVisibilidade(nullptr);
+    printf("Tempo: %f\n", tempo);
+
+    printf("Octree Com Porcentagem Chao, Com Porcentagem Predios:\n");
+    comPorcentagem = true;
+    porcentagemPredios = true;
+    passoAlgoritmo = 0;
+    tempo = algoritmoVisibilidade(nullptr);
+    printf("Tempo: %f\n", tempo);
 
     tipoArvore = KDTREE;
     nivelMaxKDTree = 3;
@@ -1506,24 +1510,8 @@ void testarTodasAsAnalises(){
     comPorcentagem = false;
     porcentagemPredios = false;
     passoAlgoritmo = 0;
-    double tempo3 = algoritmoVisibilidade(nullptr);
+    tempo = algoritmoVisibilidade(nullptr);
     printf("Tempo: %f\n", tempo);
-
-    tipoArvore = KDTREE;
-    nivelMaxKDTree = 6;
-    inicializarArvore();
-
-    printf("KD-Tree(%i) Sem Porcentagem Chao, Sem Porcentagem Predios:\n", nivelMaxKDTree);
-    comPorcentagem = false;
-    porcentagemPredios = false;
-    passoAlgoritmo = 0;
-    double tempo6 = algoritmoVisibilidade(nullptr);
-    printf("Tempo: %f\n", tempo);
-
-    if(tempo3 < tempo6){
-        nivelMaxKDTree = 3;
-        inicializarArvore();
-    }
 
     printf("KD-Tree(%i) Com Porcentagem Chao, Sem Porcentagem Predios:\n", nivelMaxKDTree);
     comPorcentagem = true;
