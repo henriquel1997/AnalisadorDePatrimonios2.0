@@ -60,6 +60,8 @@ bool salvarScreenshot(unsigned int inicioX = 0, unsigned int inicioY = 0, unsign
 void salvarMapa();
 void finalizarSalvamentoMapa();
 void selecionarPatrimoniosFortaleza();
+void resetarResultadosMemoria();
+void pegarMemoriaUsadaAtualmente();
 
 // camera
 Camera camera(4.797128f, 4.923989f, 4.238231f, 0.f, 1.f, 0.f, -139.399979f, -45.899910f);
@@ -115,6 +117,13 @@ Vertice* pontosPatrimonio = nullptr;
 IndicesOpenGL* gridIndices = nullptr;
 
 bool deveSalvarMapa = false;
+
+//Memória
+unsigned long long contCheckMemoria = 0;
+long long mediaMemoria = 0;
+long long minMemoria = 9223372036854775807;
+long long maxMemoria = 0;
+
 
 int main(){
     // glfw: initialize and configure
@@ -312,6 +321,7 @@ double algoritmoVisibilidade(IndicesOpenGL* indicesLinhas, bool mostrarTempo){
             tempoInicio = time(nullptr);
 
             resetContadores();
+            resetarResultadosMemoria();
 
             if(porcentagemPredios){
                 for(unsigned int i = 0; i < patrimonios.size; i++){
@@ -340,6 +350,8 @@ double algoritmoVisibilidade(IndicesOpenGL* indicesLinhas, bool mostrarTempo){
         }
 
         for (unsigned int i = passoAlgoritmo; i < numeroQuadradosTotal; i++) {
+
+            pegarMemoriaUsadaAtualmente();
 
             //Mostrando porcentagem completa da análise
             if(i % (numeroQuadradosTotal/10) == 0){
@@ -516,6 +528,10 @@ void salvarResultados(time_t tempoFim, double tempoTotal){
         fprintf(fp, "Numero de checagens KD-Tree: %lli\n", getNumChecagensKDTree());
         fprintf(fp, "Numero de overflow KD-Tree: %lli\n", getNumOverflowKDTree());
     }
+
+    fprintf(fp, "Média de memória utilizada: %lli (bytes)\n", mediaMemoria);
+    fprintf(fp, "Mínimo de memória utilizada: %lli (bytes)\n", minMemoria);
+    fprintf(fp, "Máximo de memória utilizada: %lli (bytes)\n", maxMemoria);
 
     fprintf(fp, "Indices dos patrimônios analisados: ");
     for(unsigned int j = 0; j < numPatrimoniosSelecionados; j++){
@@ -1572,4 +1588,31 @@ void finalizarSalvamentoMapa(){
     }
     camera.goBackToOldValues();
     deveSalvarMapa = false;
+}
+
+void resetarResultadosMemoria(){
+    mediaMemoria = 0;
+    maxMemoria = 0;
+    minMemoria = 9223372036854775807;
+    contCheckMemoria = 0;
+}
+
+void pegarMemoriaUsadaAtualmente(){
+    MEMORYSTATUSEX memInfo;
+    memInfo.dwLength = sizeof(MEMORYSTATUSEX);
+    GlobalMemoryStatusEx(&memInfo);
+    DWORDLONG physMemUsed = memInfo.ullTotalPhys - memInfo.ullAvailPhys; //Bytes
+    if(physMemUsed < minMemoria){
+        minMemoria = physMemUsed;
+    }else if(physMemUsed > maxMemoria){
+        maxMemoria = physMemUsed;
+    }
+
+    if(mediaMemoria == 0){
+        mediaMemoria = physMemUsed;
+    }else{
+        mediaMemoria = ((mediaMemoria * contCheckMemoria) + physMemUsed ) / (contCheckMemoria + 1);
+    }
+
+    contCheckMemoria++;
 }
