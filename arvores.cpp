@@ -195,6 +195,12 @@ unsigned int indexPatrimonioMaisProximo(Ray ray, Octree *octree){
 IndexDistance indexDistanceMaisProximo(IndexDistance indexDistance, Ray ray, Octree *octree){
     if(checkCollisionRayBox(&ray, &octree->regiao)){
         for(int i = 0; i < octree->numeroPatrimonios; i++){
+            numChecagensOctree++;
+            if(numChecagensOctree == 0){
+                numOverflowOctree++;
+                printf("Overflow Octree\n");
+            }
+
             Patrimonio patrimonio = octree->patrimonios[i];
             if(patrimonio.id != indexDistance.index && checkCollisionRayBox(&ray, &patrimonio.bBox)){
                 RayHitInfo newHitInfo = RayHitMesh(&ray, &patrimonio.mesh);
@@ -614,6 +620,13 @@ IndexDistance indexDistanceMaisProximo(IndexDistance indexDistance, Ray ray, KDT
 
         //TODO: Index distance com os triângulos ainda não implementado, pois eles ainda não fazem o limite de nível
         for(unsigned int i = 0; i < kdtree->numPatrimonios; i++){
+
+            numChecagensKDTree++;
+            if(numChecagensKDTree == 0){
+                numOverFlowKDTree++;
+                printf("Overflow KD-Tree\n");
+            }
+
             Patrimonio patrimonio = kdtree->patrimonio[i];
             if(checkCollisionRayBox(&ray, &patrimonio.bBox)){
                 auto hitInfo = RayHitMesh(&ray, &patrimonio.mesh);

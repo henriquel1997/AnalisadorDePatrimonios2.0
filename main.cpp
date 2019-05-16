@@ -710,7 +710,8 @@ void gerarArraySelecionados(bool* selecionados){
 void inicializarArvore(){
 
     auto memoriaInicio = pegarMemoriaUsadaAtualmente();
-    auto tempoInicio = time(nullptr);
+    struct timeb start{}, end{};
+    ftime(&start);
 
     switch (tipoArvore){
         case OCTREE:
@@ -725,11 +726,12 @@ void inicializarArvore(){
             break;
     }
 
-    auto tempoFim = time(nullptr);
+    ftime(&end);
+    int diff = (int) (1000.0 * (end.time - start.time)
+                      + (end.millitm - start.millitm));
     auto memoriaFim = pegarMemoriaUsadaAtualmente();
 
-    printf("Tempo Inicio Construcao Arvore: %lli\n", tempoInicio);
-    printf("Tempo Fim Construcao Arvore: %lli\n", tempoFim);
+    printf("Tempo Construcao Arvore: %i (ms)\n", diff);
     printf("Memoria antes de construir a Arvore: %lli (bytes)\n", memoriaInicio);
     printf("Memoria depois de construir a Arvore: %lli (bytes)\n", memoriaFim);
 }
@@ -1491,15 +1493,41 @@ void testarTodasAsAnalises(){
 
     double tempo = 0;
 
-    tipoArvore = OCTREE;
+    tipoArvore = KDTREE;
+    nivelMaxKDTree = 3;
     inicializarArvore();
 
-    printf("Octree Sem Porcentagem Chao, Sem Porcentagem Predios:\n");
-    comPorcentagem = false;
-    porcentagemPredios = false;
+    printf("KD-Tree(%i) Com Porcentagem Chao, Com Porcentagem Predios:\n", nivelMaxKDTree);
+    comPorcentagem = true;
+    porcentagemPredios = true;
     passoAlgoritmo = 0;
     tempo = algoritmoVisibilidade(nullptr);
     printf("Tempo: %f\n", tempo);
+//
+//
+//    printf("KD-Tree(%i) Sem Porcentagem Chao, Sem Porcentagem Predios:\n", nivelMaxKDTree);
+//    comPorcentagem = false;
+//    porcentagemPredios = false;
+//    passoAlgoritmo = 0;
+//    tempo = algoritmoVisibilidade(nullptr);
+//    printf("Tempo: %f\n", tempo);
+//
+//    printf("KD-Tree(%i) Com Porcentagem Chao, Sem Porcentagem Predios:\n", nivelMaxKDTree);
+//    comPorcentagem = true;
+//    porcentagemPredios = false;
+//    passoAlgoritmo = 0;
+//    tempo = algoritmoVisibilidade(nullptr);
+//    printf("Tempo: %f\n", tempo);
+
+    tipoArvore = OCTREE;
+    inicializarArvore();
+
+//    printf("Octree Sem Porcentagem Chao, Sem Porcentagem Predios:\n");
+//    comPorcentagem = false;
+//    porcentagemPredios = false;
+//    passoAlgoritmo = 0;
+//    tempo = algoritmoVisibilidade(nullptr);
+//    printf("Tempo: %f\n", tempo);
 
     printf("Octree Com Porcentagem Chao, Sem Porcentagem Predios:\n");
     comPorcentagem = true;
@@ -1509,31 +1537,6 @@ void testarTodasAsAnalises(){
     printf("Tempo: %f\n", tempo);
 
     printf("Octree Com Porcentagem Chao, Com Porcentagem Predios:\n");
-    comPorcentagem = true;
-    porcentagemPredios = true;
-    passoAlgoritmo = 0;
-    tempo = algoritmoVisibilidade(nullptr);
-    printf("Tempo: %f\n", tempo);
-
-    tipoArvore = KDTREE;
-    nivelMaxKDTree = 3;
-    inicializarArvore();
-
-    printf("KD-Tree(%i) Sem Porcentagem Chao, Sem Porcentagem Predios:\n", nivelMaxKDTree);
-    comPorcentagem = false;
-    porcentagemPredios = false;
-    passoAlgoritmo = 0;
-    tempo = algoritmoVisibilidade(nullptr);
-    printf("Tempo: %f\n", tempo);
-
-    printf("KD-Tree(%i) Com Porcentagem Chao, Sem Porcentagem Predios:\n", nivelMaxKDTree);
-    comPorcentagem = true;
-    porcentagemPredios = false;
-    passoAlgoritmo = 0;
-    tempo = algoritmoVisibilidade(nullptr);
-    printf("Tempo: %f\n", tempo);
-
-    printf("KD-Tree(%i) Com Porcentagem Chao, Com Porcentagem Predios:\n", nivelMaxKDTree);
     comPorcentagem = true;
     porcentagemPredios = true;
     passoAlgoritmo = 0;
